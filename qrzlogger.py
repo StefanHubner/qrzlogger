@@ -229,23 +229,21 @@ def queryQSOData(qso):
 # QRZ.com logbook entry via the API
 def sendQSO(qso):
 
-    insert = { 'KEY' : config['qrzlogger']['api_key'], 'ACTION' : 'INSERT', 'ADIF' :
-        '<band:' + str(len(qso['band'][1])) + '>' + qso['band'][1] +
-        '<mode:' + str(len(qso['mode'][1])) + '>' + qso['mode'][1] +
-        '<call:' + str(len(call)) + '>' + call +
-        '<qso_date:' + str(len(qso['qso_date'][1])) + '>' + qso['qso_date'][1] +
-        '<station_callsign:' + str(len(config['qrzlogger']['station_call'])) + '>' + config['qrzlogger']['station_call'] +
-        '<time_on:' + str(len(qso['time_on'][1])) + '>' + qso['time_on'][1] +
-        '<rst_rcvd:' + str(len(qso['rst_rcvd'][1])) + '>' + qso['rst_rcvd'][1] +
-        '<rst_sent:' + str(len(qso['rst_sent'][1])) + '>' + qso['rst_sent'][1] +
-        '<tx_pwr:' + str(len(qso['tx_pwr'][1])) + '>' + qso['tx_pwr'][1] +
-        '<comment:' + str(len(qso['comment'][1])) + '>' + qso['comment'][1] +
-        '<eor>'}
-    print(insert)
+    # construct ADIF QSO entry
+    adif = '<station_callsign:' + str(len(config['qrzlogger']['station_call'])) + '>' + config['qrzlogger']['station_call']
+    adif += '<call:' + str(len(call)) + '>' + call
+    for field in qso:
+        adif += '<' + field + ':' + str(len(qso[field][1])) + '>' + qso[field][1]
+    adif += '<eor>'
 
-    data = urllib.parse.urlencode(insert)
-    #print(data)
-    #resp = requests.post(config['qrzlogger']['api_url'], data=insert)
+    # construct POST data
+    post_data = { 'KEY' : config['qrzlogger']['api_key'], 'ACTION' : 'INSERT', 'ADIF' : adif }
+
+    print(post_data)
+
+    # URL encode the payload
+    data = urllib.parse.urlencode(post_data)
+    # send the POST request to QRZ.com
     resp = requests.post(config['qrzlogger']['api_url'], headers=headers, data=data)
 
     #str_resp = resp.content.decode("utf-8")
