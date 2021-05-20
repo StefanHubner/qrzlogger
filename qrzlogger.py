@@ -195,23 +195,23 @@ def queryQSOData(qso):
     dt_now = dt.replace(tzinfo=timezone.utc)
 
     qso_date = dt_now.strftime("%Y%m%d")
-    qso_time = dt_now.strftime("%H%M")
+    time_on = dt_now.strftime("%H%M")
     band = "40m"
     mode = "SSB"
     rst_rcvd = "59"
     rst_sent = "59"
-    power = "100"
+    tx_pwr = "100"
     comment = ""
 
     if qso is None:
         questions = {
             "qso_date" : ["QSO Date: ",qso_date],
-            "qso_time": ["QSO Time: ", qso_time],
+            "time_on": ["QSO Time: ", time_on],
             "band": ["Band: ", band],
             "mode": ["Mode: ", mode],
             "rst_rcvd": ["RST Received: ", rst_rcvd],
             "rst_sent": ["RST Sent: ", rst_sent],
-            "power": ["Power (in W): ", power],
+            "tx_pwr": ["Power (in W): ", tx_pwr],
             "comment": ["Comment: ", comment]
             }
     else:
@@ -229,28 +229,16 @@ def queryQSOData(qso):
 # QRZ.com logbook entry via the API
 def sendQSO(qso):
 
-    mycall = "DL6MHC"
-    '''
-    band = qso['band'][1]
-    mode = qso['mode'][1]
-    qso_date = qso['qso_date'][1]
-    qso_time = qso['qso_time'][1]
-    r_rcvd = qso['r_rcvd'][1]
-    r_sent = qso['r_sent'][1]
-    power=qso['power'][1]
-    comment=qso['comment'][1]
-    '''
-
     insert = { 'KEY' : config['qrzlogger']['api_key'], 'ACTION' : 'INSERT', 'ADIF' :
         '<band:' + str(len(qso['band'][1])) + '>' + qso['band'][1] +
         '<mode:' + str(len(qso['mode'][1])) + '>' + qso['mode'][1] +
         '<call:' + str(len(call)) + '>' + call +
         '<qso_date:' + str(len(qso['qso_date'][1])) + '>' + qso['qso_date'][1] +
-        '<station_callsign:' + str(len(mycall)) + '>' + mycall +
-        '<time_on:' + str(len(qso['qso_time'][1])) + '>' + qso['qso_time'][1] +
+        '<station_callsign:' + str(len(config['qrzlogger']['station_call'])) + '>' + config['qrzlogger']['station_call'] +
+        '<time_on:' + str(len(qso['time_on'][1])) + '>' + qso['time_on'][1] +
         '<rst_rcvd:' + str(len(qso['rst_rcvd'][1])) + '>' + qso['rst_rcvd'][1] +
         '<rst_sent:' + str(len(qso['rst_sent'][1])) + '>' + qso['rst_sent'][1] +
-        '<power:' + str(len(qso['power'][1])) + '>' + qso['power'][1] +
+        '<tx_pwr:' + str(len(qso['tx_pwr'][1])) + '>' + qso['tx_pwr'][1] +
         '<comment:' + str(len(qso['comment'][1])) + '>' + qso['comment'][1] +
         '<eor>'}
     print(insert)

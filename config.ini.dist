@@ -1,4 +1,5 @@
 [qrzlogger]
+station_call = MYCALL
 api_url = https://logbook.qrz.com/api
 api_key = 1234-ABCD-1234-A1B2
 qrz_user = N0CALL
