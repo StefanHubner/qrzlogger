@@ -1,0 +1,6 @@
+[qrzlogger]
+api_url = https://logbook.qrz.com/api
+api_key = 1234-ABCD-1234-A1B2
+qrz_user = N0CALL
+qrz_pass = q1w2e3r4t5z6u7i8o9
+xml_fields = ("call", "band", "mode", "qso_date", "time_on", "rst_sent", "rst_rcvd", "comment")
