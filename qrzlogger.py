@@ -112,6 +112,7 @@ def getQSOsForCallsign(callsign):
     data = urllib.parse.urlencode(fetch)
 
     resp = requests.post(config['qrzlogger']['api_url'], headers=headers, data=data)
+    #resp = requests.post(config['qrzlogger']['api_url'], data=fetch)
 
     str_resp = resp.content.decode("utf-8") 
     response = urllib.parse.unquote(str_resp)
@@ -197,8 +198,8 @@ def queryQSOData(qso):
     qso_time = dt_now.strftime("%H%M")
     band = "40m"
     mode = "SSB"
-    r_rcvd = "59"
-    r_sent = "59"
+    rst_rcvd = "59"
+    rst_sent = "59"
     power = "100"
     comment = ""
 
@@ -208,8 +209,8 @@ def queryQSOData(qso):
             "qso_time": ["QSO Time: ", qso_time],
             "band": ["Band: ", band],
             "mode": ["Mode: ", mode],
-            "r_rcvd": ["RPT Received: ", r_rcvd],
-            "r_sent": ["RPT Sent: ", r_sent],
+            "rst_rcvd": ["RST Received: ", rst_rcvd],
+            "rst_sent": ["RST Sent: ", rst_sent],
             "power": ["Power (in W): ", power],
             "comment": ["Comment: ", comment]
             }
@@ -227,21 +228,41 @@ def queryQSOData(qso):
 # Sends the previously collected QSO information as a new
 # QRZ.com logbook entry via the API
 def sendQSO(qso):
+
+    mycall = "DL6MHC"
+    '''
+    band = qso['band'][1]
+    mode = qso['mode'][1]
+    qso_date = qso['qso_date'][1]
+    qso_time = qso['qso_time'][1]
+    r_rcvd = qso['r_rcvd'][1]
+    r_sent = qso['r_sent'][1]
+    power=qso['power'][1]
+    comment=qso['comment'][1]
+    '''
+
     insert = { 'KEY' : config['qrzlogger']['api_key'], 'ACTION' : 'INSERT', 'ADIF' :
-        '<band:3>' + qso["band"][1] +
-        '<mode:3>' + qso["mode"][1] +
-        '<call:4>' + call +
-        '<qso_date:8>' + qso["qso_date"][1] +
-        '<station_callsign:6>DL6MHC' +
-        '<time_on:4>' + qso["qso_time"][1] +
+        '<band:' + str(len(qso['band'][1])) + '>' + qso['band'][1] +
+        '<mode:' + str(len(qso['mode'][1])) + '>' + qso['mode'][1] +
+        '<call:' + str(len(call)) + '>' + call +
+        '<qso_date:' + str(len(qso['qso_date'][1])) + '>' + qso['qso_date'][1] +
+        '<station_callsign:' + str(len(mycall)) + '>' + mycall +
+        '<time_on:' + str(len(qso['qso_time'][1])) + '>' + qso['qso_time'][1] +
+        '<rst_rcvd:' + str(len(qso['rst_rcvd'][1])) + '>' + qso['rst_rcvd'][1] +
+        '<rst_sent:' + str(len(qso['rst_sent'][1])) + '>' + qso['rst_sent'][1] +
+        '<power:' + str(len(qso['power'][1])) + '>' + qso['power'][1] +
+        '<comment:' + str(len(qso['comment'][1])) + '>' + qso['comment'][1] +
         '<eor>'}
+    print(insert)
 
     data = urllib.parse.urlencode(insert)
+    #print(data)
+    #resp = requests.post(config['qrzlogger']['api_url'], data=insert)
     resp = requests.post(config['qrzlogger']['api_url'], headers=headers, data=data)
 
-    str_resp = resp.content.decode("utf-8")
-    response = urllib.parse.unquote(str_resp)
-    print(response)
+    #str_resp = resp.content.decode("utf-8")
+    #response = urllib.parse.unquote(str_resp)
+    #print(res)
 
     return result 
 
