@@ -10,8 +10,20 @@ It does the following:
   6) lists the last 5 logged QSOs ((pulled from QRZ.com logbook)
   7) starts again from 1)
 
-Installation
-============
+# Dependecies
+
+qrzlogger needs the following libraries:
+
+ * python3-xmltodict
+ * python3-prettytable
+
+These libraries can be installed with the following command on Debian Linux based operating systems:
+
+```
+# sudo apt install python3-xmltodict python3-prettytable
+```
+
+# Installation
 
  * Copy all files into a directory
  * rename _config.ini.dist_ to _config.ini_
