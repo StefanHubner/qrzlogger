@@ -53,10 +53,11 @@ from datetime import date
 from datetime import timezone
 import configparser
 
-# read in the config
+# read the config file
 config = configparser.ConfigParser()
 config.read('config.ini')
 
+# headers for all POST requests
 headers = CaseInsensitiveDict()
 headers["Content-Type"] = "application/x-www-form-urlencoded"
 
@@ -107,12 +108,14 @@ def getCallData(call):
 # Query QRZ.com's logbook for all previous QSOs
 # with a specific call sign
 def getQSOsForCallsign(callsign):
-    option = "TYPE:ADIF,CALL:"+callsign
-    fetch = { 'KEY' : config['qrzlogger']['api_key'], 'ACTION' : 'FETCH', 'OPTION' : option}
-    data = urllib.parse.urlencode(fetch)
+    post_data = { 
+            'KEY' : config['qrzlogger']['api_key'], 
+            'ACTION' : 'FETCH', 
+            'OPTION' : "TYPE:ADIF,CALL:" + callsign 
+            }
+    post_data_enc = urllib.parse.urlencode(post_data)
 
-    resp = requests.post(config['qrzlogger']['api_url'], headers=headers, data=data)
-    #resp = requests.post(config['qrzlogger']['api_url'], data=fetch)
+    resp = requests.post(config['qrzlogger']['api_url'], headers=headers, data=post_data_enc)
 
     str_resp = resp.content.decode("utf-8") 
     response = urllib.parse.unquote(str_resp)
@@ -194,15 +197,19 @@ def queryQSOData(qso):
     dt = datetime.datetime.now(timezone.utc)
     dt_now = dt.replace(tzinfo=timezone.utc)
 
+    # pre-fill the fields with date, time and
+    # default values from the config file
     qso_date = dt_now.strftime("%Y%m%d")
     time_on = dt_now.strftime("%H%M")
-    band = "40m"
-    mode = "SSB"
-    rst_rcvd = "59"
-    rst_sent = "59"
-    tx_pwr = "100"
+    band = config['qrzlogger']['band']
+    mode = config['qrzlogger']['mode']
+    rst_rcvd = config['qrzlogger']['rst_rcvd']
+    rst_sent = config['qrzlogger']['rst_sent']
+    tx_pwr = config['qrzlogger']['tx_pwr']
     comment = ""
 
+    # If this is the first try filling out the QSO fields
+    # then we use defaults
     if qso is None:
         questions = {
             "qso_date" : ["QSO Date: ",qso_date],
@@ -214,11 +221,17 @@ def queryQSOData(qso):
             "tx_pwr": ["Power (in W): ", tx_pwr],
             "comment": ["Comment: ", comment]
             }
+    # if this is not the first try, we pre-fill the
+    # vaulues we got from the last try
     else:
         questions = qso
 
+    # We now loop through all defined fields and ask
+    # the user for input
     for q in questions:
         inp = input(questions[q][0]+" ["+questions[q][1]+"]: " )
+        # If the user just hits enter, we keep the default value.
+        # If not, we keep the data provided by the user
         if inp != "":
             questions[q][1] = inp
 
