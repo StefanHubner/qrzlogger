@@ -1,5 +1,4 @@
-qrzlogger
-=========
+# qrzlogger
 
 This script is a QRZ.com command line QSO logger.
 It does the following:
@@ -11,8 +10,17 @@ It does the following:
   6) lists the last 5 logged QSOs ((pulled from QRZ.com logbook)
   7) starts again from 1)
 
+Installation
+============
 
-MIT License
+ * Copy all files into a directory
+ * rename _config.ini.dist_ to _config.ini_
+ * adapt _config.ini_ to your needs
+ * execute with "python3 qrzlogger.py"
+
+
+
+# MIT License
 
 Copyright (c) 2021 Michael Clemens, DL6MHC
 
@@ -34,7 +42,8 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
+# WARNING
 
-WARNING: This software is beta and is really not working properly yet!
+This software is beta and is really not working properly yet!
 I'll remove this warning when it's done
 
