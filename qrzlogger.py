@@ -52,6 +52,7 @@ from requests.structures import CaseInsensitiveDict
 from datetime import date
 from datetime import timezone
 import configparser
+from colored import fore, back, style
 
 # read the config file
 config = configparser.ConfigParser()
@@ -63,6 +64,24 @@ headers["Content-Type"] = "application/x-www-form-urlencoded"
 
 session = None
 session_key = None
+
+# Read user definable colors from config
+if config['qrzlogger']['use_colors'] == "yes":
+    inputcol = eval(config['qrzlogger']['inputcol'])
+    hlcol = eval(config['qrzlogger']['hlcol'])
+    defvalcol = eval(config['qrzlogger']['defvalcol'])
+    errorcol = eval(config['qrzlogger']['errorcol'])
+    successcol = eval(config['qrzlogger']['successcol'])
+    tablecol = eval(config['qrzlogger']['tablecol'])
+    logocol = eval(config['qrzlogger']['logocol'])
+else:
+    inputcol = style.RESET
+    hlcol = style.RESET
+    defvalcol = style.RESET
+    errorcol = style.RESET
+    successcol = style.RESET
+    tablecol = style.RESET
+    logocol = style.RESET
 
 
 # Generate a session for QRZ.com's xml service with
@@ -213,14 +232,14 @@ def queryQSOData(qso):
     # then we use defaults
     if qso is None:
         questions = {
-            "qso_date" : ["QSO Date: ",qso_date],
-            "time_on": ["QSO Time: ", time_on],
-            "band": ["Band: ", band],
-            "mode": ["Mode: ", mode],
-            "rst_rcvd": ["RST Received: ", rst_rcvd],
-            "rst_sent": ["RST Sent: ", rst_sent],
-            "tx_pwr": ["Power (in W): ", tx_pwr],
-            "comment": ["Comment: ", comment]
+            "qso_date" : ["QSO Date",qso_date],
+            "time_on": ["QSO Time", time_on],
+            "band": ["Band", band],
+            "mode": ["Mode", mode],
+            "rst_rcvd": ["RST Received", rst_rcvd],
+            "rst_sent": ["RST Sent", rst_sent],
+            "tx_pwr": ["Power (in W)", tx_pwr],
+            "comment": ["Comment", comment]
             }
     # if this is not the first try, we pre-fill the
     # vaulues we got from the last try
@@ -230,7 +249,8 @@ def queryQSOData(qso):
     # We now loop through all defined fields and ask
     # the user for input
     for q in questions:
-        inp = input(questions[q][0]+" ["+questions[q][1]+"]: " )
+        txt = inputcol + questions[q][0] + " [" + defvalcol + questions[q][1] + inputcol + "]:" + style.RESET
+        inp = input(txt)
         # If the user just hits enter, we keep the default value.
         # If not, we keep the data provided by the user
         if inp != "":
@@ -251,8 +271,6 @@ def sendQSO(qso):
         adif += '<' + field + ':' + str(len(qso[field][1])) + '>' + qso[field][1]
     adif += '<eor>'
 
-    print(adif)
-
     # construct POST data
     post_data = { 'KEY' : config['qrzlogger']['api_key'], 'ACTION' : 'INSERT', 'ADIF' : adif }
 
@@ -265,14 +283,18 @@ def sendQSO(qso):
     # Check if the upload failed and print out
     # the reason plus some additional info
     if "STATUS=FAIL" in response:
-        print("\nQSO upload failed. QRZ.com has send the following reason:\n")
+        print(errorcol)
+        print("QSO upload failed. QRZ.com has send the following reason:\n")
         resp_list = response.split("&")
         for item in resp_list:
             print(item)
         print("\nPlease review the following request that led to this error:\n")
+        print(style.RESET)
         print(post_data)
     else:
+        print(successcol)
         print("QSO successfully uploaded to QRZ.com")
+        print(style.RESET)
         is_ok = True
     return is_ok
 
@@ -282,7 +304,7 @@ def sendQSO(qso):
 # returns False in "n"
 def askUser(question):
     while True:
-        inp = input("\n" + question + " [y/n]: ")
+        inp = input("\n" + inputcol + question + " [" + defvalcol +  "y/n" + inputcol + "]: " + style.RESET)
         if inp == "y":
             return True
         elif inp == "n":
@@ -295,28 +317,33 @@ if __name__ == '__main__':
     keeponlogging = True
     get_session()
 
-    print("              _                        ")
+    print(logocol + "              _                        ")
     print("  __ _ _ _ __| |___  __ _ __ _ ___ _ _ ")
     print(" / _` | '_|_ / / _ \/ _` / _` / -_) '_|")
     print(" \__, |_| /__|_\___/\__, \__, \___|_|  ")
-    print("    |_|             |___/|___/         ")
+    print("    |_|             |___/|___/         " + style.RESET)
 
     while keeponlogging:
-        call = input("\n\nEnter Callsign: ")
+        call = input("\n\n%sEnter Callsign:%s " % (inputcol, style.RESET))
+        call = call.upper()
 
-        print('\nQRZ.com results for {0}:\n'.format(call))
+        print ('\n%s%sQRZ.com results for %s%s' % (style.UNDERLINED, hlcol, call, style.RESET))
 
         result = getCallData(call)
         tab = getXMLQueryTable(result)
+        print(tablecol)
         print(tab)
+        print(style.RESET)
 
-        print('\n\nPrevious QSOs with {0}:\n'.format(call))
+        print ('%s%sPrevious QSOs with %s%s' % (style.UNDERLINED, hlcol, call, style.RESET))
 
         result = getQSOsForCallsign(call)
         tab = getQSOTable(result)
+        print(tablecol)
         print(tab)
+        print(style.RESET)
 
-        print('\nEnter new QSO details below:\n')
+        print ('%s%sEnter new QSO details below%s\n' % (style.UNDERLINED, hlcol, style.RESET))
 
         qso_ok = False
         qso = None
@@ -325,10 +352,12 @@ if __name__ == '__main__':
         while not qso_ok:
             # query QSO details from thbe user
             qso = queryQSOData(qso)
-            print(qso)
+            print ('\n%s%sPlease review your choices%s' % (style.UNDERLINED, hlcol, style.RESET))
             # generate a pretty table
             tab = getQSODetailTable(qso)
+            print(tablecol)
             print(tab)
+            print(style.RESET)
             # ask user if everything is ok. If not, start over.
             if askUser("Is this correct?"):
                 qso_ok = sendQSO(qso)
@@ -353,4 +382,6 @@ if __name__ == '__main__':
                         # quit the application
                         keeponlogging = False
 
-    print("\nBye, bye!")
+    print(inputcol)
+    print("Bye, bye!")
+    print(style.RESET)

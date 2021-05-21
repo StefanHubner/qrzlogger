@@ -12,3 +12,13 @@ mode = SSB
 rst_rcvd = 59
 rst_sent = 59
 tx_pwr = 5
+
+#colors
+use_colors = yes
+inputcol = fore.YELLOW
+hlcol = fore.YELLOW
+defvalcol = fore.LIGHT_BLUE
+errorcol = fore.RED
+successcol = fore.GREEN
+tablecol = fore.LIGHT_BLUE
+logocol = fore.YELLOW

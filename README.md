@@ -14,13 +14,14 @@ It does the following:
 
 qrzlogger needs the following libraries:
 
- * python3-xmltodict
- * python3-prettytable
+ * xmltodict
+ * prettytable
+ * colored
 
 These libraries can be installed with the following command on Debian Linux based operating systems:
 
 ```
-# sudo apt install python3-xmltodict python3-prettytable
+# sudo apt install python3-xmltodict python3-prettytable python3-colored
 ```
 
 Furthermore, you need at least the XML subscription from QRZ.com.
