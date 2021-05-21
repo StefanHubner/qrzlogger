@@ -7,8 +7,11 @@ It does the following:
   3) displays all previous QSOs with this call (pulled from QRZ.com logbook)
   4) asks the user to enter QSO specific data (date, time, report, band etc.)
   5) uploads the QSO to QRZ.com's logbook
-  6) lists the last 5 logged QSOs ((pulled from QRZ.com logbook)
-  7) starts again from 1)
+  6) starts again from 1)
+
+# Screnshot
+
+![screenshot](/screenshot.jpg?raw=true "screenshot")
 
 # Dependencies
 
@@ -33,8 +36,6 @@ Furthermore, you need at least the XML subscription from QRZ.com.
  * adapt _config.ini_ to your needs
  * execute with "python3 qrzlogger.py"
 
-
-
 # MIT License
 
 Copyright (c) 2021 Michael Clemens, DL6MHC
@@ -56,9 +57,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
-# WARNING
-
-This software is beta and is really not working properly yet!
-I'll remove this warning when it's done
-
