@@ -5,7 +5,7 @@ It does the following:
   1) asks the user for a call sign
   2) displays available call sign info pulled from QRZ.com
   3) displays all previous QSOs with this call (pulled from QRZ.com logbook)
-  4) alles the user to enter QSO specific data (date, time, report, band etc.)
+  4) asks the user to enter QSO specific data (date, time, report, band etc.)
   5) uploads the QSO to QRZ.com's logbook
   6) lists the last 5 logged QSOs ((pulled from QRZ.com logbook)
   7) starts again from 1)
