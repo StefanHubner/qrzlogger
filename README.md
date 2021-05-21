@@ -10,7 +10,7 @@ It does the following:
   6) lists the last 5 logged QSOs ((pulled from QRZ.com logbook)
   7) starts again from 1)
 
-# Dependecies
+# Dependencies
 
 qrzlogger needs the following libraries:
 
