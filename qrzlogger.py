@@ -121,7 +121,7 @@ def getCallData(call):
         calldata = raw.get('Callsign')
         if calldata:
             return calldata
-    return "nope"
+    return None
 
 
 # Query QRZ.com's logbook for all previous QSOs
@@ -326,13 +326,18 @@ if __name__ == '__main__':
         call = input("\n\n%sEnter Callsign:%s " % (inputcol, style.RESET))
         call = call.upper()
 
-        print ('\n%s%sQRZ.com results for %s%s' % (style.UNDERLINED, hlcol, call, style.RESET))
-
         result = getCallData(call)
-        tab = getXMLQueryTable(result)
-        print(tablecol)
-        print(tab)
-        print(style.RESET)
+        if result:
+            print ('\n%s%sQRZ.com results for %s%s' % (style.UNDERLINED, hlcol, call, style.RESET))
+            tab = getXMLQueryTable(result)
+            print(tablecol)
+            print(tab)
+            print(style.RESET)
+        else:
+            print ('\n%s%s has no record on QRZ.com ¯\_(ツ)_/¯%s' % (errorcol, call, style.RESET))
+            if not askUser("Continue with logging this QSO?"):
+                break
+            print("")
 
         result = getQSOsForCallsign(call)
         if result[0]:
