@@ -151,7 +151,6 @@ def getQSOsForCallsign(callsign):
                 v = re.sub('^.*:',"",i, flags=re.DOTALL)
                 k = re.sub(':.*$',"",i, flags=re.DOTALL)
                 result[-1][k] = v
-
     return result
 
 
@@ -335,13 +334,13 @@ if __name__ == '__main__':
         print(tab)
         print(style.RESET)
 
-        print ('%s%sPrevious QSOs with %s%s' % (style.UNDERLINED, hlcol, call, style.RESET))
-
         result = getQSOsForCallsign(call)
-        tab = getQSOTable(result)
-        print(tablecol)
-        print(tab)
-        print(style.RESET)
+        if result[0]:
+            print ('%s%sPrevious QSOs with %s%s' % (style.UNDERLINED, hlcol, call, style.RESET))
+            tab = getQSOTable(result)
+            print(tablecol)
+            print(tab)
+            print(style.RESET)
 
         print ('%s%sEnter new QSO details below%s\n' % (style.UNDERLINED, hlcol, style.RESET))
 
@@ -383,5 +382,5 @@ if __name__ == '__main__':
                         keeponlogging = False
 
     print(inputcol)
-    print("Bye, bye!")
+    print("73!")
     print(style.RESET)
