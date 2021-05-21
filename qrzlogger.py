@@ -153,6 +153,7 @@ def getQSOTable(result):
     t.align = "r"
     return t
 
+
 # Print a pretty ascii table containing all interesting
 # data found for a specific call sign
 def getXMLQueryTable(result):
@@ -241,6 +242,7 @@ def queryQSOData(qso):
 # Sends the previously collected QSO information as a new
 # QRZ.com logbook entry via the API
 def sendQSO(qso):
+    is_ok = False
 
     # construct ADIF QSO entry
     adif = '<station_callsign:' + str(len(config['qrzlogger']['station_call'])) + '>' + config['qrzlogger']['station_call']
@@ -252,54 +254,100 @@ def sendQSO(qso):
     # construct POST data
     post_data = { 'KEY' : config['qrzlogger']['api_key'], 'ACTION' : 'INSERT', 'ADIF' : adif }
 
-    print(post_data)
-
     # URL encode the payload
     data = urllib.parse.urlencode(post_data)
     # send the POST request to QRZ.com
     resp = requests.post(config['qrzlogger']['api_url'], headers=headers, data=data)
+    str_resp = resp.content.decode("utf-8")
+    response = urllib.parse.unquote(str_resp)
+    # Check if the upload failed and print out
+    # the reason plus some additional info
+    if "STATUS=FAIL" in response:
+        print("\nQSO upload failed. QRZ.com has send the following reason:\n")
+        resp_list = response.split("&")
+        for item in resp_list:
+            print(item)
+        print("\nPlease review the following request that led to this error:\n")
+        print(post_data)
+    else:
+        print("QSO successfully uploaded to QRZ.com")
+        is_ok = True
+    return is_ok
 
-    #str_resp = resp.content.decode("utf-8")
-    #response = urllib.parse.unquote(str_resp)
-    #print(res)
 
-    return result 
+# ask a user a simple y/n question
+# returns True if "y"
+# returns False in "n"
+def askUser(question):
+    while True:
+        inp = input("\n" + question + " [y/n]: ")
+        if inp == "y":
+            return True
+        elif inp == "n":
+            return False
 
 
 # Main routine
 if __name__ == '__main__':
 
+    keeponlogging = True
     get_session()
-    call = input("Enter Callsign: ")
 
-    print('\nQRZ.com results for {0}:\n'.format(call))
+    print("              _                        ")
+    print("  __ _ _ _ __| |___  __ _ __ _ ___ _ _ ")
+    print(" / _` | '_|_ / / _ \/ _` / _` / -_) '_|")
+    print(" \__, |_| /__|_\___/\__, \__, \___|_|  ")
+    print("    |_|             |___/|___/         ")
 
-    result = getCallData(call)
-    tab = getXMLQueryTable(result)
-    print(tab)
+    while keeponlogging:
+        call = input("\n\nEnter Callsign: ")
 
-    print('\n\nPrevious QSOs with {0}:\n'.format(call))
+        print('\nQRZ.com results for {0}:\n'.format(call))
 
-    result = getQSOsForCallsign(call)
-    tab = getQSOTable(result)
-    print(tab)
-
-    print('\nEnter new QSO details below ("c" to cancel, "b" to go one entry back):\n')
-
-    qso_ok = False
-    qso = None
-   
-    while not qso_ok:
-        # query QSO details from thbe user
-        qso = queryQSOData(qso)
-        # generate a pretty table
-        tab = getQSODetailTable(qso)
+        result = getCallData(call)
+        tab = getXMLQueryTable(result)
         print(tab)
-        # ask user if everything is ok. If not, start over.
-        inp = input("Is this correct? [y/n]: " )
-        if inp == "y":
-            res = sendQSO(qso)
-            print(res)
 
-            qso_ok = True
+        print('\n\nPrevious QSOs with {0}:\n'.format(call))
 
+        result = getQSOsForCallsign(call)
+        tab = getQSOTable(result)
+        print(tab)
+
+        print('\nEnter new QSO details below:\n')
+
+        qso_ok = False
+        qso = None
+        ask_try_again = False
+       
+        while not qso_ok:
+            # query QSO details from thbe user
+            qso = queryQSOData(qso)
+            # generate a pretty table
+            tab = getQSODetailTable(qso)
+            print(tab)
+            # ask user if everything is ok. If not, start over.
+            if askUser("Is this correct?"):
+                qso_ok = sendQSO(qso)
+                # QSO successfully sent.
+                if qso_ok:
+                    qso = None
+                    keeponlogging = askUser("Log another QSO?")
+                # QSO upload failed
+                else:
+                    ask_try_again = True
+            else:
+                ask_try_again = True
+            # We ask the user if he/she wants to try again
+            # and - if not - another QSO should be logged
+            if ask_try_again:
+                if not askUser("Try again?"):
+                    # user answered with "n"
+                    # we quit the loop and reset the QSO fields
+                    qso_ok = True
+                    qso = None
+                    if not askUser("Log another QSO?"):
+                        # quit the application
+                        keeponlogging = False
+
+    print("\nBye, bye!")

@@ -23,6 +23,8 @@ These libraries can be installed with the following command on Debian Linux base
 # sudo apt install python3-xmltodict python3-prettytable
 ```
 
+Furthermore, you need at least the XML subscription from QRZ.com.
+
 # Installation
 
  * Copy all files into a directory
