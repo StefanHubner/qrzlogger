@@ -83,6 +83,22 @@ else:
     tablecol = style.RESET
     logocol = style.RESET
 
+bandfreqs = {
+    '160m' : '1.850',
+    '80m' : '3.700',
+    '60m' : '5.355',
+    '40m' : '7.100',
+    '30m' : '10.130',
+    '20m' : '14.200',
+    '17m' : '18.130',
+    '15m' : '21.200',
+    '12m' : '24.950',
+    '10m' : '28.500',
+    '6m' : '50.150',
+    '2m' : '145.500',
+    '70cm' : '432.300'
+    }
+
 
 # Generate a session for QRZ.com's xml service with
 # the help of the QRZ.com username and password
@@ -91,14 +107,18 @@ def get_session():
     global session_key
     xml_auth_url = '''https://xmldata.QRZ.com/xml/current/?username={0}&password={1}'''.format(
         config['qrzlogger']['qrz_user'],config['qrzlogger']['qrz_pass'])
-    session = requests.Session()
-    session.verify = bool(os.getenv('SSL_VERIFY', True))
-    r = session.get(xml_auth_url)
-    if r.status_code == 200:
-        raw_session = xmltodict.parse(r.content)
-        session_key = raw_session.get('QRZDatabase').get('Session').get('Key')
-        if session_key:
-            return True
+    try:
+        session = requests.Session()
+        session.verify = bool(os.getenv('SSL_VERIFY', True))
+        r = session.get(xml_auth_url)
+        if r.status_code == 200:
+            raw_session = xmltodict.parse(r.content)
+            session_key = raw_session.get('QRZDatabase').get('Session').get('Key')
+            if session_key:
+                return True
+    except:
+        pass
+        
     return False
 
 
@@ -214,6 +234,7 @@ def queryQSOData(qso):
     qso_date = dt_now.strftime("%Y%m%d")
     time_on = dt_now.strftime("%H%M")
     band = config['qrzlogger']['band']
+    freq = ""
     mode = config['qrzlogger']['mode']
     rst_rcvd = config['qrzlogger']['rst_rcvd']
     rst_sent = config['qrzlogger']['rst_sent']
@@ -227,6 +248,7 @@ def queryQSOData(qso):
             "qso_date" : ["QSO Date",qso_date],
             "time_on": ["QSO Time", time_on],
             "band": ["Band", band],
+            "freq": ["Frequency", freq],
             "mode": ["Mode", mode],
             "rst_rcvd": ["RST Received", rst_rcvd],
             "rst_sent": ["RST Sent", rst_sent],
@@ -249,7 +271,12 @@ def queryQSOData(qso):
             return None
         if inp != "":
             questions[q][1] = inp
-
+        # check if we are asking for the band
+        if q == "band":
+            # check if the band is in the bandfreqs dictionary
+            if questions[q][1] in bandfreqs:
+                # populate the frequency with a common freq of this band
+                questions['freq'][1] = bandfreqs[questions[q][1]]
     return questions
 
 
