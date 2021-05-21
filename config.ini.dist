@@ -7,8 +7,8 @@ qrz_pass = q1w2e3r4t5z6u7i8o9
 xml_fields = ("call", "band", "mode", "qso_date", "time_on", "rst_sent", "rst_rcvd", "comment")
 
 # default values for new QSOs
-band = "40m"
-mode = "SSB"
-rst_rcvd = "59"
-rst_sent = "59"
-tx_pwr = "5"
+band = 40m
+mode = SSB
+rst_rcvd = 59
+rst_sent = 59
+tx_pwr = 5

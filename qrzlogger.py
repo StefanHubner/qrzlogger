@@ -251,6 +251,8 @@ def sendQSO(qso):
         adif += '<' + field + ':' + str(len(qso[field][1])) + '>' + qso[field][1]
     adif += '<eor>'
 
+    print(adif)
+
     # construct POST data
     post_data = { 'KEY' : config['qrzlogger']['api_key'], 'ACTION' : 'INSERT', 'ADIF' : adif }
 
@@ -323,6 +325,7 @@ if __name__ == '__main__':
         while not qso_ok:
             # query QSO details from thbe user
             qso = queryQSOData(qso)
+            print(qso)
             # generate a pretty table
             tab = getQSODetailTable(qso)
             print(tab)
