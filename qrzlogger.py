@@ -171,16 +171,15 @@ def getQSOsForCallsign(callsign):
 # previous QSOs with a specific call sign
 def getQSOTable(result):
     t = PrettyTable(['Date', 'Time', 'Band', 'Mode', 'RST-S', 'RST-R', 'Comment'])
-    for d in result:
-        if "qso_date" in d:
-            date = datetime.datetime.strptime(d["qso_date"], '%Y%m%d').strftime('%Y/%m/%d')
-            time = datetime.datetime.strptime(d["time_on"], '%H%M').strftime('%H:%M')
-            comment = ""
-            try:
-                comment = d["comment"]
-            except:
-                comment = ""
-            t.add_row([date, time, d["band"], d["mode"], d["rst_sent"], d["rst_rcvd"], comment])
+    for qso in result:
+        if "qso_date" in qso:
+            date = datetime.datetime.strptime(qso["qso_date"], '%Y%m%d').strftime('%Y/%m/%d')
+            time = datetime.datetime.strptime(qso["time_on"], '%H%M').strftime('%H:%M')
+            # add missing fields to dict
+            for field in ["band", "mode", "rst_sent", "rst_rcvd", "comment"]:
+                if field not in qso:
+                    qso[field] = ""
+            t.add_row([date, time, qso["band"], qso["mode"], qso["rst_sent"], qso["rst_rcvd"], qso["comment"]])
     t.align = "r"
     return t
 
