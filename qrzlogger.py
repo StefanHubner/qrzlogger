@@ -348,10 +348,14 @@ if __name__ == '__main__':
     # Begin the main loop
     while keeponlogging:
         # query a call sign from the user
+        resume = True
         call = input("\n\n%sEnter Callsign:%s " % (inputcol, style.RESET))
         # check if it has the format of a valid call sign
         # (at least 3 characters, only alphanumeric and slashes)
-        if len(call) > 2 and call.replace("/", "").isalnum():
+        if not (len(call) > 2 and call.replace("/", "").isalnum()):
+            print(errorcol + "\nPlease enter a callsign with\n * at least 3 characters\n * only letters, numbers and slashes" + style.RESET)
+            resume = False
+        if resume:
             # make the call sign all upper case
             call = call.upper()
             # query call sign data from QRZ
@@ -369,72 +373,48 @@ if __name__ == '__main__':
             else:
                 print ('\n%s%s has no record on QRZ.com ¯\_(ツ)_/¯%s' % (errorcol, call, style.RESET))
                 # ask the user if he/she likes to continue anyway
-                if not askUser("Continue with logging this QSO?"):
+                if not askUser("Continue logging this call sign?"):
                     # restart from the beginning
-                    break
+                    resume = False
                 print("")
-            # pull all previous QSOs from tzhe QRZ logbook
-            result = getQSOsForCallsign(call)
-            # ignore this part if there were no previous QSOs
-            if result[0]:
-                print ('%s%sPrevious QSOs with %s%s' % (style.UNDERLINED, hlcol, call, style.RESET))
-                # generate a nice ascii table with the result
-                tab = getQSOTable(result)
-                # print the table
-                print(tablecol)
-                print(tab)
-                print(style.RESET)
-
-            print ('%s%sEnter new QSO details below%s%s (enter \'c\' to cancel)%s\n' % (style.UNDERLINED, hlcol, style.RESET, hlcol, style.RESET,))
-
-            qso_ok = False
-            qso = None
-            ask_try_again = False
-
-            # we now ask the user for QSO details until he/she is happy with the result
-            while not qso_ok:
-                # query QSO details from the user
-                qso = queryQSOData(qso)
-                # the user has answered all questions
-                if qso:
-                    print ('\n%s%sPlease review your choices%s' % (style.UNDERLINED, hlcol, style.RESET))
-                    # generate a pretty table
-                    tab = getQSODetailTable(qso)
+            if resume:
+                # pull all previous QSOs from tzhe QRZ logbook
+                result = getQSOsForCallsign(call)
+                # ignore this part if there were no previous QSOs
+                if result[0]:
+                    print ('%s%sPrevious QSOs with %s%s' % (style.UNDERLINED, hlcol, call, style.RESET))
+                    # generate a nice ascii table with the result
+                    tab = getQSOTable(result)
                     # print the table
                     print(tablecol)
                     print(tab)
                     print(style.RESET)
-                    # ask user if everything is ok. If not, start over.
-                    if askUser("Is this correct?"):
-                        qso_ok = sendQSO(qso)
-                        # QSO successfully sent.
-                        if qso_ok:
-                            qso = None
-                            keeponlogging = askUser("Log another QSO?")
-                        # QSO upload failed
-                        else:
-                            ask_try_again = True
+
+                print ('%s%sEnter new QSO details below%s%s (enter \'c\' to cancel)%s\n' % (style.UNDERLINED, hlcol, style.RESET, hlcol, style.RESET,))
+
+                qso_ok = False
+                qso = None
+
+                # we now ask the user for QSO details until he/she is happy with the result
+                while not qso_ok and resume:
+                    # query QSO details from the user
+                    qso = queryQSOData(qso)
+                    # the user has answered all questions
+                    if qso:
+                        print ('\n%s%sPlease review your choices%s' % (style.UNDERLINED, hlcol, style.RESET))
+                        # generate a pretty table
+                        tab = getQSODetailTable(qso)
+                        # print the table
+                        print(tablecol)
+                        print(tab)
+                        print(style.RESET)
+                        # ask user if everything is ok. If not, start over.
+                        if askUser("Is this correct?"):
+                            qso_ok = sendQSO(qso)
+                    # the user has entered 'c' during the QSO detail entering process
                     else:
-                        ask_try_again = True
-                    # We ask the user if he/she wants to try again
-                    # and - if not - another QSO should be logged
-                    if ask_try_again:
-                        if not askUser("Try again?"):
-                            # user answered with "n"
-                            # we quit the loop and reset the QSO fields
-                            qso_ok = True
-                            qso = None
-                            if not askUser("Log another QSO?"):
-                                # quit the application
-                                keeponlogging = False
-                # the user has entered 'c' during the QSO detail entering process
-                else:
-                    qso_ok = True
-                    qso = None
-        # the user entered a too short callsign or invalid characters
-        else:
-            print(errorcol + "\nPlease enter a callsign with\n * at least 3 characters\n * only letters, numbers and slashes" + style.RESET)
-                    
+                        resume = False
+                        
 
     print(inputcol)
     print("73!")
