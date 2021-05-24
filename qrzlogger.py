@@ -129,7 +129,7 @@ def get_session():
 
 
 # Sends a POST request to QRZ.com, checks for errors
-# and returns teh response
+# and returns the response
 def sendRequest(post_data):
     try:
         resp = requests.post(config['qrzlogger']['api_url'], headers=headers, data=post_data)
@@ -182,13 +182,14 @@ def getCallData(call):
 
 
 # Query QRZ.com's logbook for all previous QSOs
-# with a specific call sign
-def getQSOsForCallsign(callsign):
+# with a specific call sign or for a specific
+# logid
+def getQSOs(option):
     post_data = { 
-            'KEY' : config['qrzlogger']['api_key'], 
-            'ACTION' : 'FETCH', 
-            'OPTION' : "TYPE:ADIF,CALL:" + callsign 
-            }
+        'KEY' : config['qrzlogger']['api_key'],
+        'ACTION' : 'FETCH',
+        'OPTION' : "TYPE:ADIF," + option
+        }
     post_data = urllib.parse.urlencode(post_data)
 
     response = sendRequest(post_data)
@@ -214,16 +215,16 @@ def getQSOsForCallsign(callsign):
 # Generate a pretty ascii table containing all
 # previous QSOs with a specific call sign
 def getQSOTable(result):
-    t = PrettyTable(['Date', 'Time', 'Band', 'Mode', 'RST-S', 'RST-R', 'Comment'])
+    t = PrettyTable(['Date', 'Time', 'Band', 'Mode', 'RST-S', 'RST-R', 'Power', 'Comment'])
     for qso in result:
         if "qso_date" in qso:
             date = datetime.datetime.strptime(qso["qso_date"], '%Y%m%d').strftime('%Y/%m/%d')
             time = datetime.datetime.strptime(qso["time_on"], '%H%M').strftime('%H:%M')
             # add missing fields to dict
-            for field in ["band", "mode", "rst_sent", "rst_rcvd", "comment"]:
+            for field in ["band", "mode", "rst_sent", "rst_rcvd", "tx_pwr", "comment"]:
                 if field not in qso:
                     qso[field] = ""
-            t.add_row([date, time, qso["band"], qso["mode"], qso["rst_sent"], qso["rst_rcvd"], qso["comment"]])
+            t.add_row([date, time, qso["band"], qso["mode"], qso["rst_sent"], qso["rst_rcvd"], qso["tx_pwr"], qso["comment"]])
     t.align = "r"
     return t
 
@@ -326,7 +327,7 @@ def queryQSOData(qso):
 # Sends the previously collected QSO information as a new
 # QRZ.com logbook entry via the API
 def sendQSO(qso):
-    is_ok = False
+    logid = "null"
 
     # construct ADIF QSO entry
     adif = '<station_callsign:' + str(len(config['qrzlogger']['station_call'])) + '>' + config['qrzlogger']['station_call']
@@ -355,11 +356,14 @@ def sendQSO(qso):
             print(style.RESET)
             print(post_data)
         else:
+            try:
+                logid = re.search('LOGID=(\d+)', response).group(1)
+            except:
+                logid = "null"
             print(successcol)
-            print("QSO successfully uploaded to QRZ.com")
+            print("QSO successfully uploaded to QRZ.com (LOGID "+ logid + ")")
             print(style.RESET)
-            is_ok = True
-        return is_ok
+        return logid
     else:
         print(errorcol + "\nA critical error occured. Please review all previous output." + style.RESET)
 
@@ -425,7 +429,7 @@ if __name__ == '__main__':
                 print("")
             if resume:
                 # pull all previous QSOs from tzhe QRZ logbook
-                result = getQSOsForCallsign(call)
+                result = getQSOs("CALL:"+ call)
                 # ignore this part if there were no previous QSOs
                 if result and result[0]:
                     print ('%s%sPrevious QSOs with %s%s' % (style.UNDERLINED, hlcol, call, style.RESET))
@@ -456,7 +460,19 @@ if __name__ == '__main__':
                         print(style.RESET)
                         # ask user if everything is ok. If not, start over.
                         if askUser("Is this correct?"):
-                            qso_ok = sendQSO(qso)
+                            logid = sendQSO(qso)
+                            if logid and logid != "null":
+                                # pull the uploaded QSO from QRZ
+                                result = getQSOs("LOGIDS:"+ logid)
+                                if result and result[0]:
+                                    #print ('%sQSO uploaded to QRZ.com:%s' % (hlcol, style.RESET))
+                                    # generate a nice ascii table with the result
+                                    tab = getQSOTable(result)
+                                    # print the table
+                                    print(tablecol)
+                                    print(tab)
+                                    print(style.RESET)
+                                qso_ok = True
                     # the user has entered 'c' during the QSO detail entering process
                     else:
                         resume = False
