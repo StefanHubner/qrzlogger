@@ -7,7 +7,8 @@ It does the following:
   3) displays all previous QSOs with this call (pulled from QRZ.com logbook)
   4) asks the user to enter QSO specific data (date, time, report, band etc.)
   5) uploads the QSO to QRZ.com's logbook
-  6) starts again from 1)
+  5) fetches the just uploaded QSO from QRZ.com for review
+  7) starts again from 1)
 
 # Screnshot
 
