@@ -116,10 +116,44 @@ def get_session():
             session_key = raw_session.get('QRZDatabase').get('Session').get('Key')
             if session_key:
                 return True
+    except requests.exceptions.ConnectionError as e_conn:
+        print(errorcol + "\nUnable to connect to xmldata.qrz.com:")
+        print(e_conn)
+        print("\nPlease check if\n * username and password are correct (see config.ini)\n * you are connected to the internet")
+        print(style.RESET)
     except:
-        pass
-        
+        print(errorcol + "\nsomething unexpected has happened:\n")
+        print(e_conn)
+        print(style.RESET)
     return False
+
+
+# Sends a POST request to QRZ.com, checks for errors
+# and returns teh response
+def sendRequest(post_data):
+    try:
+        resp = requests.post(config['qrzlogger']['api_url'], headers=headers, data=post_data)
+        if resp.status_code == 200:
+            str_resp = resp.content.decode("utf-8")
+            response = urllib.parse.unquote(str_resp)
+            resp_list = response.splitlines()
+            if resp_list[0]:
+                if "invalid api key" in resp_list[0]:
+                    print(errorcol + "\nThe API key configured in config.ini is not correct.\n" + style.RESET)
+                else:
+                    return response
+        elif resp.status_code == 404:
+            print(errorcol + "\nThe API URL could not be found. Please check the URL in config.ini\n" + style.RESET)
+    except requests.exceptions.ConnectionError as e_conn:
+        print(errorcol + "\nUnable to connect to xmldata.qrz.com:")
+        print(e_conn)
+        print("\nPlease check if you are connected to the internet")
+        print(style.RESET)
+    except:
+        print(errorcol + "\nsomething unexpected has happened:\n")
+        print(e_conn)
+        print(style.RESET)
+    return None
 
 
 # Query QRZ.com's xml api to gather information
@@ -128,12 +162,22 @@ def getCallData(call):
     global session
     global session_key
 
-    xml_url = """https://xmldata.QRZ.com/xml/current/?s={0}&callsign={1}""" .format(session_key, call)
-    r = session.get(xml_url)
-    raw = xmltodict.parse(r.content).get('QRZDatabase')
-    calldata = raw.get('Callsign')
-    if calldata:
-        return calldata
+    try:
+        xml_url = """https://xmldata.QRZ.com/xml/current/?s={0}&callsign={1}""" .format(session_key, call)
+        r = session.get(xml_url)
+        raw = xmltodict.parse(r.content).get('QRZDatabase')
+        calldata = raw.get('Callsign')
+        if calldata:
+            return calldata
+    except requests.exceptions.ConnectionError as e_conn:
+        print(errorcol + "\nUnable to connect to xmldata.qrz.com:")
+        print(e_conn)
+        print("\nPlease check if you are connected to the internet")
+        print(style.RESET)
+    except:
+        print(errorcol + "\nsomething unexpected has happened:\n")
+        print(e_conn)
+        print(style.RESET)
     return None
 
 
@@ -145,26 +189,26 @@ def getQSOsForCallsign(callsign):
             'ACTION' : 'FETCH', 
             'OPTION' : "TYPE:ADIF,CALL:" + callsign 
             }
-    post_data_enc = urllib.parse.urlencode(post_data)
+    post_data = urllib.parse.urlencode(post_data)
 
-    resp = requests.post(config['qrzlogger']['api_url'], headers=headers, data=post_data_enc)
+    response = sendRequest(post_data)
 
-    str_resp = resp.content.decode("utf-8") 
-    response = urllib.parse.unquote(str_resp)
-
-    resp_list = response.splitlines()
-    result = [{}]
-    for i in resp_list:
-        if not i:
-            result.append({})
-        else:
-            if any(s+":" in i for s in config['qrzlogger']['xml_fields']):
-                i = re.sub('&lt;','',i, flags=re.DOTALL)
-                i = re.sub(':.*&gt;',":",i, flags=re.DOTALL)
-                v = re.sub('^.*:',"",i, flags=re.DOTALL)
-                k = re.sub(':.*$',"",i, flags=re.DOTALL)
-                result[-1][k] = v
-    return result
+    if response:
+        resp_list = response.splitlines()
+        result = [{}]
+        for i in resp_list:
+            if not i:
+                result.append({})
+            else:
+                if any(s+":" in i for s in config['qrzlogger']['xml_fields']):
+                    i = re.sub('&lt;','',i, flags=re.DOTALL)
+                    i = re.sub(':.*&gt;',":",i, flags=re.DOTALL)
+                    v = re.sub('^.*:',"",i, flags=re.DOTALL)
+                    k = re.sub(':.*$',"",i, flags=re.DOTALL)
+                    result[-1][k] = v
+        return result
+    else:
+        return None
 
 
 # Generate a pretty ascii table containing all
@@ -297,26 +341,27 @@ def sendQSO(qso):
     # URL encode the payload
     data = urllib.parse.urlencode(post_data)
     # send the POST request to QRZ.com
-    resp = requests.post(config['qrzlogger']['api_url'], headers=headers, data=data)
-    str_resp = resp.content.decode("utf-8")
-    response = urllib.parse.unquote(str_resp)
+    response = sendRequest(data)
     # Check if the upload failed and print out
     # the reason plus some additional info
-    if "STATUS=FAIL" in response:
-        print(errorcol)
-        print("QSO upload failed. QRZ.com has send the following reason:\n")
-        resp_list = response.split("&")
-        for item in resp_list:
-            print(item)
-        print("\nPlease review the following request that led to this error:\n")
-        print(style.RESET)
-        print(post_data)
+    if response:
+        if "STATUS=FAIL" in response:
+            print(errorcol)
+            print("QSO upload failed. QRZ.com has send the following reason:\n")
+            resp_list = response.split("&")
+            for item in resp_list:
+                print(item)
+            print("\nPlease review the following request that led to this error:\n")
+            print(style.RESET)
+            print(post_data)
+        else:
+            print(successcol)
+            print("QSO successfully uploaded to QRZ.com")
+            print(style.RESET)
+            is_ok = True
+        return is_ok
     else:
-        print(successcol)
-        print("QSO successfully uploaded to QRZ.com")
-        print(style.RESET)
-        is_ok = True
-    return is_ok
+        print(errorcol + "\nA critical error occured. Please review all previous output." + style.RESET)
 
 
 # ask a user a simple y/n question
@@ -335,8 +380,6 @@ def askUser(question):
 if __name__ == '__main__':
 
     keeponlogging = True
-    # get a session after logging into QRZ with user/pass
-    get_session()
 
     # print an awesome banner
     print(logocol + "              _                        ")
@@ -344,6 +387,9 @@ if __name__ == '__main__':
     print(" / _` | '_|_ / / _ \/ _` / _` / -_) '_|")
     print(" \__, |_| /__|_\___/\__, \__, \___|_|  ")
     print("    |_|             |___/|___/         " + style.RESET)
+
+    # get a session after logging into QRZ with user/pass
+    get_session()
 
     # Begin the main loop
     while keeponlogging:
@@ -381,7 +427,7 @@ if __name__ == '__main__':
                 # pull all previous QSOs from tzhe QRZ logbook
                 result = getQSOsForCallsign(call)
                 # ignore this part if there were no previous QSOs
-                if result[0]:
+                if result and result[0]:
                     print ('%s%sPrevious QSOs with %s%s' % (style.UNDERLINED, hlcol, call, style.RESET))
                     # generate a nice ascii table with the result
                     tab = getQSOTable(result)
