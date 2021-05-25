@@ -1,20 +1,39 @@
 [qrzlogger]
+
+# MANDATORY configuration seetings
+
+# Enter here your station call (must match with the QRZ.com logbook)
 station_call = MYCALL
-api_url = https://logbook.qrz.com/api
+
+# Enter here you API key. You find it under "settings" in the QRZ.com logbook
 api_key = 1234-ABCD-1234-A1B2
+
+# Enter here you QRZ.com user name, typically your call sign
 qrz_user = N0CALL
+
+# Entere here you QRZ.com password (not the API key)
 qrz_pass = q1w2e3r4t5z6u7i8o9
+
+
+# OPTIONAL configuration seetings
+
+# You shouldn't need to change this URL except when QRZ.com changes it some day
+api_url = https://logbook.qrz.com/api
+
+# The fields you want to pull from the XML service when querying a call sign
 xml_fields = ("call", "band", "mode", "qso_date", "time_on", "rst_sent", "rst_rcvd", "comment")
+
+# The name and path of the log file where successful and failed ADIF records will be logged into
 log_file = qrzlogger.log
 
-# default values for new QSOs
+# Default values for new QSOs
 band = 40m
 mode = SSB
 rst_rcvd = 59
 rst_sent = 59
 tx_pwr = 5
 
-#colors
+# Change these colors to your liking
 use_colors = yes
 inputcol = fore.YELLOW
 hlcol = fore.YELLOW
