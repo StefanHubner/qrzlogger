@@ -37,7 +37,6 @@
 # SOFTWARE.
 
 
-
 import requests
 import urllib
 import re
@@ -101,6 +100,9 @@ bandfreqs = {
     '70cm' : '432.300'
     }
 
+#####################################################
+#             QRZ.com API Functions                 #
+#####################################################
 
 # Generate a session for QRZ.com's xml service with
 # the help of the QRZ.com username and password
@@ -214,6 +216,59 @@ def getQSOs(option):
         return None
 
 
+# Sends the previously collected QSO information as a new
+# QRZ.com logbook entry via the API
+def sendQSO(qso):
+    logid = "null"
+    log_status = "FAILED:  "
+
+    # construct ADIF QSO entry
+    adif = '<station_callsign:' + str(len(config['qrzlogger']['station_call'])) + '>' + config['qrzlogger']['station_call']
+    adif += '<call:' + str(len(call)) + '>' + call
+    for field in qso:
+        adif += '<' + field + ':' + str(len(qso[field][1])) + '>' + qso[field][1]
+    adif += '<eor>'
+
+    # construct POST data
+    post_data = { 'KEY' : config['qrzlogger']['api_key'], 'ACTION' : 'INSERT', 'ADIF' : adif }
+
+    # URL encode the payload
+    data = urllib.parse.urlencode(post_data)
+    # send the POST request to QRZ.com
+    response = sendRequest(data)
+    # Check if the upload failed and print out
+    # the reason plus some additional info
+    if response:
+        if "STATUS=FAIL" in response:
+            print(errorcol)
+            print("QSO upload failed. QRZ.com has send the following reason:\n")
+            resp_list = response.split("&")
+            for item in resp_list:
+                print(item)
+            print("\nPlease review the following request that led to this error:\n")
+            print(style.RESET)
+            print(post_data)
+        else:
+            try:
+                logid = re.search('LOGID=(\d+)', response).group(1)
+            except:
+                logid = "null"
+            print(successcol)
+            print("QSO successfully uploaded to QRZ.com (LOGID "+ logid + ")")
+            log_status = "SUCCESS: "
+            print(style.RESET)
+        with open(log_file, "a") as log:
+            log.write(log_status + adif + "\n")
+        return logid
+    else:
+        print(errorcol + "\nA critical error occured. Please review all previous output." + style.RESET)
+
+
+
+#####################################################
+#     Functions for generating  ASCII Tables        #
+#####################################################
+
 # Generate a pretty ascii table containing all
 # previous QSOs with a specific call sign
 def getQSOTable(result):
@@ -268,6 +323,11 @@ def getQSODetailTable(qso):
     t.header = False    
     return t
 
+
+
+#####################################################
+#          User Interaction Functions               #
+#####################################################
 
 # Queries QSO specific data from the user via
 # the command line
@@ -326,55 +386,6 @@ def queryQSOData(qso):
     return questions
 
 
-# Sends the previously collected QSO information as a new
-# QRZ.com logbook entry via the API
-def sendQSO(qso):
-    logid = "null"
-    log_status = "FAILED:  "
-
-    # construct ADIF QSO entry
-    adif = '<station_callsign:' + str(len(config['qrzlogger']['station_call'])) + '>' + config['qrzlogger']['station_call']
-    adif += '<call:' + str(len(call)) + '>' + call
-    for field in qso:
-        adif += '<' + field + ':' + str(len(qso[field][1])) + '>' + qso[field][1]
-    adif += '<eor>'
-
-    # construct POST data
-    post_data = { 'KEY' : config['qrzlogger']['api_key'], 'ACTION' : 'INSERT', 'ADIF' : adif }
-
-    # URL encode the payload
-    data = urllib.parse.urlencode(post_data)
-    # send the POST request to QRZ.com
-    response = sendRequest(data)
-    # Check if the upload failed and print out
-    # the reason plus some additional info
-    if response:
-        if "STATUS=FAIL" in response:
-            print(errorcol)
-            print("QSO upload failed. QRZ.com has send the following reason:\n")
-            resp_list = response.split("&")
-            for item in resp_list:
-                print(item)
-            print("\nPlease review the following request that led to this error:\n")
-            print(style.RESET)
-            print(post_data)
-        else:
-            try:
-                logid = re.search('LOGID=(\d+)', response).group(1)
-            except:
-                logid = "null"
-            print(successcol)
-            print("QSO successfully uploaded to QRZ.com (LOGID "+ logid + ")")
-            log_status = "SUCCESS: "
-            print(style.RESET)
-        with open(log_file, "a") as log:
-            log.write(log_status + adif + "\n")
-        return logid
-    else:
-        print(errorcol + "\nA critical error occured. Please review all previous output." + style.RESET)
-
-
-
 # ask a user a simple y/n question
 # returns True if "y"
 # returns False in "n"
@@ -386,6 +397,11 @@ def askUser(question):
         elif inp == "n":
             return False
 
+
+
+#####################################################
+#                  Main Routine                     #
+#####################################################
 
 # Main routine
 if __name__ == '__main__':
@@ -484,7 +500,6 @@ if __name__ == '__main__':
                     else:
                         resume = False
                         
-
     print(inputcol)
     print("73!")
     print(style.RESET)
