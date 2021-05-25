@@ -65,6 +65,11 @@ headers["Content-Type"] = "application/x-www-form-urlencoded"
 session = None
 session_key = None
 
+if config['qrzlogger']['log_file']:
+    log_file = config['qrzlogger']['log_file']
+else:
+    log_file = "qrzlogger.log"
+
 # Read user definable colors from config
 if config['qrzlogger']['use_colors'] == "yes":
     inputcol = eval(config['qrzlogger']['inputcol'])
@@ -328,6 +333,7 @@ def queryQSOData(qso):
 # QRZ.com logbook entry via the API
 def sendQSO(qso):
     logid = "null"
+    log_status = "FAILED:  "
 
     # construct ADIF QSO entry
     adif = '<station_callsign:' + str(len(config['qrzlogger']['station_call'])) + '>' + config['qrzlogger']['station_call']
@@ -362,10 +368,14 @@ def sendQSO(qso):
                 logid = "null"
             print(successcol)
             print("QSO successfully uploaded to QRZ.com (LOGID "+ logid + ")")
+            log_status = "SUCCESS: "
             print(style.RESET)
+        with open(log_file, "a") as log:
+            log.write(log_status + adif + "\n")
         return logid
     else:
         print(errorcol + "\nA critical error occured. Please review all previous output." + style.RESET)
+
 
 
 # ask a user a simple y/n question
