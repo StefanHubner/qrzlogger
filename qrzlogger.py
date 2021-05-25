@@ -37,9 +37,6 @@
 # SOFTWARE.
 
 
-# WARNING: This software is beta and is really not working properly yet!
-# I'll remove this warning when it's done
-
 
 import requests
 import urllib
