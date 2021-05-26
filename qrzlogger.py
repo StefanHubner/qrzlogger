@@ -54,6 +54,10 @@ from colored import fore, back, style
 config = configparser.ConfigParser()
 config.read('config.ini')
 
+# QRZ.com URLs
+xml_url = "https://xmldata.QRZ.com/xml/current/"
+api_url = "https://logbook.qrz.com/api"
+
 # headers for all POST requests
 headers = CaseInsensitiveDict()
 headers["Content-Type"] = "application/x-www-form-urlencoded"
@@ -109,12 +113,16 @@ bandfreqs = {
 def get_session():
     global session
     global session_key
-    xml_auth_url = '''https://xmldata.QRZ.com/xml/current/?username={0}&password={1}'''.format(
-        config['qrzlogger']['qrz_user'],config['qrzlogger']['qrz_pass'])
+
+    data = { 
+        'username' : config['qrzlogger']['qrz_user'],
+        'password' : config['qrzlogger']['qrz_pass']
+        }
+
     try:
         session = requests.Session()
         session.verify = bool(os.getenv('SSL_VERIFY', True))
-        r = session.get(xml_auth_url)
+        r = session.post(xml_url, data=data)
         if r.status_code == 200:
             raw_session = xmltodict.parse(r.content)
             session_key = raw_session.get('QRZDatabase').get('Session').get('Key')
@@ -136,7 +144,7 @@ def get_session():
 # and returns the response
 def sendRequest(post_data):
     try:
-        resp = requests.post(config['qrzlogger']['api_url'], headers=headers, data=post_data)
+        resp = requests.post(api_url, headers=headers, data=post_data)
         if resp.status_code == 200:
             str_resp = resp.content.decode("utf-8")
             response = urllib.parse.unquote(str_resp)
@@ -166,9 +174,15 @@ def getCallData(call):
     global session
     global session_key
 
+    data = { 
+        's' : session_key,
+        'callsign' : call
+        }
+
     try:
-        xml_url = """https://xmldata.QRZ.com/xml/current/?s={0}&callsign={1}""" .format(session_key, call)
-        r = session.get(xml_url)
+        session = requests.Session()
+        session.verify = bool(os.getenv('SSL_VERIFY', True))
+        r = session.post(xml_url, data=data)
         raw = xmltodict.parse(r.content).get('QRZDatabase')
         calldata = raw.get('Callsign')
         if calldata:

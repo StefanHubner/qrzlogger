@@ -17,9 +17,6 @@ qrz_pass = q1w2e3r4t5z6u7i8o9
 
 # OPTIONAL configuration seetings
 
-# You shouldn't need to change this URL except when QRZ.com changes it some day
-api_url = https://logbook.qrz.com/api
-
 # The fields you want to pull from the XML service when querying a call sign
 xml_fields = ("call", "band", "mode", "qso_date", "time_on", "rst_sent", "rst_rcvd", "comment")
 
