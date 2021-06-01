@@ -40,4 +40,4 @@ Furthermore, you need at least the XML subscription from QRZ.com.
 
 # License
 
-see LICENSE
+see ![LICENSE](LICENSE)
