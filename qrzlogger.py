@@ -123,9 +123,8 @@ class qrzlogger():
                 
             with open(file_name, 'w') as configfile:
               config.write(configfile) 
-            print(self.errorcol + "\nNo configuration file found. A new configuration file has been created.")
+            print("\nNo configuration file found. A new configuration file has been created.")
             print("\nPlease edit the file " + file_name + " and restart the application.\n" )
-            print(style.RESET)
             quit()
         return config
 
