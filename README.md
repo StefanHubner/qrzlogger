@@ -22,7 +22,7 @@ qrzlogger needs the following libraries:
  * prettytable
  * colored
 
-These libraries can be installed with the following commands:
+These libraries can be installed with the following command:
 
 ```
 # sudo pip install xmltodict prettytable colored
@@ -32,11 +32,11 @@ Furthermore, you need at least the XML subscription from QRZ.com.
 
 # Installation
 
- * copy _qrzlogger.py_ into a directory
- * execute with "python3 qrzlogger.py"
+ * install via pip with "pip3 install qrzlogger"
+ * execute with "qrzlogger"
  * the application creates a default config file and states its location (_~/.qrzlogger.ini_)
  * adapt _~/.qrzlogger.ini_ to your needs
- * execute the application again with "python3 qrzlogger.py"
+ * execute the application again with "qrzlogger"
 
 # License
 
