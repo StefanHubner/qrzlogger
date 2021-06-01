@@ -19,6 +19,7 @@ import urllib
 import re
 import datetime
 import os
+import sys
 import xmltodict
 from prettytable import PrettyTable
 from requests.structures import CaseInsensitiveDict
@@ -27,7 +28,7 @@ from datetime import timezone
 import configparser
 from colored import fore, back, style
 
-class qrzlogger():
+class QRZLogger():
 
 
     # initialize things
@@ -478,7 +479,7 @@ class qrzlogger():
         print("  __ _ _ _ __| |___  __ _ __ _ ___ _ _ ")
         print(" / _` | '_|_ / / _ \/ _` / _` / -_) '_|")
         print(" \__, |_| /__|_\___/\__, \__, \___|_|  ")
-        print("    |_|             |___/|___/         " + style.RESET)
+        print("    |_|   DL6MHC    |___/|___/  v0.6   " + style.RESET)
         
 
 
@@ -486,9 +487,10 @@ class qrzlogger():
 #                  Main Routine                     #
 #####################################################
 
-if __name__ == '__main__':
 
-    q = qrzlogger()
+def main():
+
+    q = QRZLogger()
     q.printBanner()
 
     keeponlogging = True
@@ -581,3 +583,7 @@ if __name__ == '__main__':
     print(q.inputcol)
     print("73!")
     print(style.RESET)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

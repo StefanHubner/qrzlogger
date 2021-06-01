@@ -22,10 +22,10 @@ qrzlogger needs the following libraries:
  * prettytable
  * colored
 
-These libraries can be installed with the following command on Debian Linux based operating systems:
+These libraries can be installed with the following commands:
 
 ```
-# sudo apt install python3-xmltodict python3-prettytable python3-colored
+# sudo pip install xmltodict prettytable colored
 ```
 
 Furthermore, you need at least the XML subscription from QRZ.com.
