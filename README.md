@@ -14,28 +14,38 @@ It does the following:
 
 ![screenshot](/screenshot.jpg?raw=true "screenshot")
 
-# Dependencies
+# Installation
 
-qrzlogger needs the following libraries:
+qrzlogger needs Python 3 and the following libraries:
 
  * xmltodict
  * prettytable
  * colored
-
-These libraries can be installed with the following command:
-
-```
-# sudo pip install xmltodict prettytable colored
-```
+ * requests
 
 Furthermore, you need at least the XML subscription from QRZ.com.
 
-# Installation
+Before installing qrzlogger, please make sure that pip, setuptools and wheel are installed and up-to-date:
 
- * install via pip with "pip3 install qrzlogger"
- * execute with "qrzlogger"
- * the application creates a default config file and states its location (_~/.qrzlogger.ini_)
- * adapt _~/.qrzlogger.ini_ to your needs
+```
+# python3 -m pip install --upgrade pip setuptools wheel
+```
+
+Finally, install qrzlogger with pip:
+
+```
+# python3 -m pip install qrzlogger
+```
+
+# Usage
+
+ * execute the application with "qrzlogger"
+ * qrzlogger creates a default config file and states its location (e.g. _~/.qrzlogger.ini_)
+ * adapt _~/.qrzlogger.ini_ to your needs. Important setting are:
+    * station_call: This is your station call (must match with the QRZ.com logbook)
+    * api_key: Your QRZ.com API key. You find it under "settings" in the QRZ.com logbook'
+    * qrz_user: Your QRZ.com user name, typically your call sign'
+    * qrz_pass: Your QRZ.com password (not the API key)'
  * execute the application again with "qrzlogger"
 
 # License

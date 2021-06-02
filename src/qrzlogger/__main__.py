@@ -84,10 +84,10 @@ class QRZLogger():
         else:
             config = configparser.ConfigParser()
             config['qrz.com'] = {
-                'station_call': 'MYCALL # Enter here your station call (must match with the QRZ.com logbook)',
-                'api_key': '1234-ABCD-1234-A1B2 # Enter here you API key. You find it under "settings" in the QRZ.com logbook',
-                'qrz_user': 'N0CALL # Enter here you QRZ.com user name, typically your call sign',
-                'qrz_pass': 'q1w2e3r4t5z6u7i8o9 # Enter here you QRZ.com password (not the API key)',
+                'station_call': 'MYCALL',
+                'api_key': '1234-ABCD-1234-A1B2',
+                'qrz_user': 'MYCALL',
+                'qrz_pass': 'my_secret_password',
                 'xml_fields': '("call", "band", "mode", "qso_date", "time_on", "rst_sent", "rst_rcvd", "comment")'}
             config['log'] = {
                 'log_file': '/tmp/qrzlogger.log'}
@@ -479,7 +479,7 @@ class QRZLogger():
         print("  __ _ _ _ __| |___  __ _ __ _ ___ _ _ ")
         print(" / _` | '_|_ / / _ \/ _` / _` / -_) '_|")
         print(" \__, |_| /__|_\___/\__, \__, \___|_|  ")
-        print("    |_|   DL6MHC    |___/|___/  v0.6   " + style.RESET)
+        print("    |_|   DL6MHC    |___/|___/  v0.6.1 " + style.RESET)
         
 
 
