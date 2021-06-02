@@ -45,7 +45,7 @@ class QRZLogger():
         self.config = configparser.ConfigParser()
         self.config_file = os.path.expanduser('~/.qrzlogger.ini')
 
-        self.writeDefaultConfig(self.config, self.config_file)
+        self.readConfig(self.config, self.config_file)
 
         if self.config and self.config['log']['log_file']:
             self.log_file = self.config['log']['log_file']
@@ -98,7 +98,9 @@ class QRZLogger():
             self.logocol = eval(self.config['colors']['logocol'])
 
 
-    def writeDefaultConfig(self, config, file_name):
+    # reads the configuration from the config file or
+    # creates a default config file if none could be found
+    def readConfig(self, config, file_name):
         if os.path.isfile(file_name):
             config.read(file_name)
         else:
