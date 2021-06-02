@@ -1,17 +1,22 @@
 #!/usr/bin/env python3
 
-# qrzlogger
-# =========
-#
-# This script is a QRZ.com command line QSO logger.
-# It does the following:
-#   1) asks the user for a call sign
-#   2) displays available call sign info pulled from QRZ.com
-#   3) displays all previous QSOs with this call (pulled from QRZ.com logbook)
-#   4) alles the user to enter QSO specific data (date, time, report, band etc.)
-#   5) uploads the QSO to QRZ.com's logbook
-#   6) lists the last 5 logged QSOs ((pulled from QRZ.com logbook)
-#   7) starts again from 1)
+#######################################################################
+#                            _                                        # 
+#                __ _ _ _ __| |___  __ _ __ _ ___ _ _                 #
+#               / _` | '_|_ / / _ \/ _` / _` / -_) '_|                #
+#               \__, |_| /__|_\___/\__, \__, \___|_|                  #
+#                  |_|             |___/|___/                         #
+#                                                                     #
+#                                                                     #
+# A python application to log QSOs directly to QRZ.com from the CLI   #
+#                                                                     #
+# Author:           Michael Clemens, DL6MHC (qrzlogger@qrz.is)        #
+#                                                                     # 
+# Documentation:    Please see the README.md file                     #
+# License:          Please see the LICENSE file                       #
+# Repository:       https://github.com/exitnode/qrzlogger             #
+#                                                                     #
+#######################################################################
 
 
 import requests
@@ -28,11 +33,14 @@ from datetime import timezone
 import configparser
 from colored import fore, back, style
 
-class QRZLogger():
 
+class QRZLogger():
 
     # initialize things
     def __init__(self):
+
+        self.version = "0.6.2"
+
         # Define the configuration object
         self.config = configparser.ConfigParser()
         self.config_file = os.path.expanduser('~/.qrzlogger.ini')
@@ -42,7 +50,7 @@ class QRZLogger():
         if self.config and self.config['log']['log_file']:
             self.log_file = self.config['log']['log_file']
         else:
-            self.log_file = "/tmp/qrzlogger.log"
+            self.log_file = os.path.expanduser('~/.qrzlogger.log')
 
 
         # QRZ.com URLs
@@ -64,6 +72,18 @@ class QRZLogger():
 
         # read colors from config and overwrite default vaulues
         self.configColors()
+
+
+    # print an awesome banner
+    def printBanner(self):
+        v = self.version
+        print(self.logocol)
+        print("              _                        ")
+        print("  __ _ _ _ __| |___  __ _ __ _ ___ _ _ ")
+        print(" / _` | '_|_ / / _ \/ _` / _` / -_) '_|")
+        print(" \__, |_| /__|_\___/\__, \__, \___|_|  ")
+        print("    |_| -=DL6MHC=-  |___/|___/ v"+v+"  ")
+        print(style.RESET)
 
 
     # Read color settings from config file
@@ -439,48 +459,6 @@ class QRZLogger():
             elif inp == "n":
                 return False
 
-    # initialize things
-    def __init__(self):
-        # Define the configuration object
-        self.config = configparser.ConfigParser()
-        self.config_file = os.path.expanduser('~/.qrzlogger.ini')
-
-        self.writeDefaultConfig(self.config, self.config_file)
-
-        if self.config and self.config['log']['log_file']:
-            self.log_file = self.config['log']['log_file']
-        else:
-            self.log_file = "/tmp/qrzlogger.log"
-
-
-        # QRZ.com URLs
-        self.xml_url = "https://xmldata.QRZ.com/xml/current/"
-        self.api_url = "https://logbook.qrz.com/api"
-
-        # headers for all POST requests
-        self.headers = CaseInsensitiveDict()
-        self.headers["Content-Type"] = "application/x-www-form-urlencoded"
-
-        # Default colors
-        self.inputcol = style.RESET
-        self.hlcol = style.RESET
-        self.defvalcol = style.RESET
-        self.errorcol = style.RESET
-        self.successcol = style.RESET
-        self.tablecol = style.RESET
-        self.logocol = style.RESET
-
-        # read colors from config and overwrite default vaulues
-        self.configColors()
-
-    # print an awesome banner
-    def printBanner(self):
-        print(self.logocol + "              _                        ")
-        print("  __ _ _ _ __| |___  __ _ __ _ ___ _ _ ")
-        print(" / _` | '_|_ / / _ \/ _` / _` / -_) '_|")
-        print(" \__, |_| /__|_\___/\__, \__, \___|_|  ")
-        print("    |_|   DL6MHC    |___/|___/  v0.6.1 " + style.RESET)
-        
 
 
 #####################################################
