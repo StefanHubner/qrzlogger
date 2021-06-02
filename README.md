@@ -37,6 +37,14 @@ Finally, install qrzlogger with pip:
 # python3 -m pip install qrzlogger
 ```
 
+# Updating
+
+To update qrzlogger, execute the following command:
+
+```
+# python3 -m pip install --upgrade qrzlogger
+```
+
 # Usage
 
  * execute the application with "qrzlogger"
