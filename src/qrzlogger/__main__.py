@@ -32,6 +32,8 @@ from datetime import date
 from datetime import timezone
 import configparser
 from colored import fore, back, style
+import signal
+import atexit
 
 
 class QRZLogger():
@@ -39,7 +41,7 @@ class QRZLogger():
     # initialize things
     def __init__(self):
 
-        self.version = "0.6.5"
+        self.version = "0.6.6"
 
         # Define the configuration object
         self.config = configparser.ConfigParser()
@@ -150,6 +152,25 @@ class QRZLogger():
             print("\nPlease edit the file " + file_name + " and restart the application.\n" )
             quit()
         return config
+
+
+    # returns the actual call sign without any indicators
+    # (e.g, "/p" or "F/")
+    def removeIndicators(self, call):
+        cleaned_call = call
+        if call.endswith(("/P","/M","/QRP")):
+            cleaned_call = re.sub(r'/\w$', "",  call)
+        if "/" in cleaned_call:
+            cleaned_call = re.sub(r'^\w+/', "", cleaned_call)
+        return cleaned_call
+
+
+    # Print the table object to stdout
+    def printTable(self, tab):
+        print(self.tablecol)
+        print(tab)
+        print(style.RESET)
+
 
 
     #####################################################
@@ -452,18 +473,13 @@ class QRZLogger():
         return questions
 
 
-    # ask a user a simple y/n question
-    # returns True if "y"
-    # returns False in "n"
-    def askUser(self, question):
-        while True:
-            inp = input("\n" + self.inputcol + question + " [" + self.defvalcol +  "y/n/quit" + self.inputcol + "]: " + style.RESET)
-            if inp == "y":
-                return True
-            elif inp == "n":
-                return False
-            elif inp == "quit":
-                sys.exit()
+def handler(signum, frame):
+    return None
+
+
+# Prints a message when the application is terminated
+def quit_gracefully():
+    print("\n73!\n")
 
 
 
@@ -471,8 +487,10 @@ class QRZLogger():
 #                  Main Routine                     #
 #####################################################
 
-
 def main():
+
+    signal.signal(signal.SIGINT, handler)
+    atexit.register(quit_gracefully)
 
     q = QRZLogger()
     q.printBanner()
@@ -482,95 +500,89 @@ def main():
 
     # Begin the main loop
     while keeponlogging:
-        try:
-            # get a session after logging into QRZ with user/pass
-            session_key = q.get_session()
-            # query a call sign from the user
-            resume = True
-            call = input("\n\n%sEnter Callsign:%s " % (q.inputcol, style.RESET))
-            if call == "quit":
-                sys.exit()
-            # check if it has the format of a valid call sign
-            # (at least 3 characters, only alphanumeric and slashes)
-            if not (len(call) > 2 and call.replace("/", "").isalnum()):
-                print(q.errorcol + "\nPlease enter a callsign with\n * at least 3 characters\n * only letters, numbers and slashes" + style.RESET)
-                resume = False
-            if resume:
-                # make the call sign all upper case
-                call = call.upper()
+        # get a session after logging into QRZ with user/pass
+        session_key = q.get_session()
+        # query a call sign from the user
+        call = input("\n\n%sEnter Callsign:%s " % (q.inputcol, style.RESET))
+        if call == "quit":
+            sys.exit()
+        # check if it has the format of a valid call sign
+        # (at least 3 characters, only alphanumeric and slashes)
+        if not (len(call) > 2 and call.replace("/", "").isalnum()):
+            print(q.errorcol + "\nPlease enter a callsign with\n * at least 3 characters\n * only letters, numbers and slashes" + style.RESET)
+            continue
+        # make the call sign all upper case
+        call = call.upper()
+        # query call sign data from QRZ
+        result = q.getCallData(call, session_key)
+        # the query was successful
+        if result:
+            print ('\n%s%sQRZ.com results for %s%s' % (style.UNDERLINED, q.hlcol, call, style.RESET))
+            # generate a nice ascii table with the result
+            q.printTable(q.getXMLQueryTable(result))
+        # the query was unsuccessful
+        else:
+            print ('\n%s%s has no record on QRZ.com ¯\_(ツ)_/¯%s' % (q.errorcol, call, style.RESET))
+            cleaned_call = q.removeIndicators(call)
+            if call != cleaned_call:
                 # query call sign data from QRZ
-                result = q.getCallData(call, session_key)
+                result = q.getCallData(cleaned_call, session_key)
                 # the query was successful
                 if result:
-                    print ('\n%s%sQRZ.com results for %s%s' % (style.UNDERLINED, q.hlcol, call, style.RESET))
+                    print ('\n%s%sShowing results for %s instead%s' % (style.UNDERLINED, q.hlcol, cleaned_call, style.RESET))
                     # generate a nice ascii table with the result
-                    tab = q.getXMLQueryTable(result)
-                    # print the table
-                    print(q.tablecol)
-                    print(tab)
-                    print(style.RESET)
-                # the query was unsuccessful
-                else:
-                    print ('\n%s%s has no record on QRZ.com ¯\_(ツ)_/¯%s' % (q.errorcol, call, style.RESET))
-                    # ask the user if he/she likes to continue anyway
-                    if not q.askUser("Continue logging this call sign?"):
-                        # restart from the beginning
-                        resume = False
-                    print("")
-                if resume:
-                    # pull all previous QSOs from tzhe QRZ logbook
-                    result = q.getQSOs("CALL:"+ call)
-                    # ignore this part if there were no previous QSOs
-                    if result and result[0]:
-                        print ('%s%sPrevious QSOs with %s%s' % (style.UNDERLINED, q.hlcol, call, style.RESET))
-                        # generate a nice ascii table with the result
-                        tab = q.getQSOTable(result)
-                        # print the table
-                        print(q.tablecol)
-                        print(tab)
-                        print(style.RESET)
+                    q.printTable(q.getXMLQueryTable(result))
+            print("")
+        # pull all previous QSOs from tzhe QRZ logbook
+        result = q.getQSOs("CALL:"+ call)
+        # ignore this part if there were no previous QSOs
+        if result and result[0]:
+            print ('%s%sPrevious QSOs with %s%s' % (style.UNDERLINED, q.hlcol, call, style.RESET))
+            q.printTable(q.getQSOTable(result))
 
-                    print ('%s%sEnter new QSO details below%s%s (enter \'c\' to cancel)%s\n' % (style.UNDERLINED, q.hlcol, style.RESET, q.hlcol, style.RESET,))
+        print ('%s%sEnter new QSO details below%s%s (enter \'c\' to cancel)%s\n' % (style.UNDERLINED, q.hlcol, style.RESET, q.hlcol, style.RESET,))
 
-                    qso_ok = False
-                    qso = None
+        done = False
+        qso = None
 
-                    # we now ask the user for QSO details until he/she is happy with the result
-                    while not qso_ok and resume:
-                        # query QSO details from the user
-                        qso = q.queryQSOData(qso)
-                        # the user has answered all questions
-                        if qso:
-                            print ('\n%s%sPlease review your choices%s' % (style.UNDERLINED, q.hlcol, style.RESET))
-                            # generate a pretty table
-                            tab = q.getQSODetailTable(qso)
-                            # print the table
-                            print(q.tablecol)
-                            print(tab)
-                            print(style.RESET)
-                            # ask user if everything is ok. If not, start over.
-                            if q.askUser("Is this correct?"):
-                                logid = q.sendQSO(qso, call)
-                                if logid and logid != "null":
-                                    # pull the uploaded QSO from QRZ
-                                    result = q.getQSOs("LOGIDS:"+ logid)
-                                    if result and result[0]:
-                                        #print ('%sQSO uploaded to QRZ.com:%s' % (hlcol, style.RESET))
-                                        # generate a nice ascii table with the result
-                                        tab = q.getQSOTable(result)
-                                        # print the table
-                                        print(q.tablecol)
-                                        print(tab)
-                                        print(style.RESET)
-                                    qso_ok = True
-                        # the user has entered 'c' during the QSO detail entering process
-                        else:
-                            resume = False
-        except:
-            print("\n\n73!\n")
-            sys.exit()
+        # we now ask the user for QSO details until he/she is happy with the result
+        resume = True
+        while not done:
+            # query QSO details from the user
+            qso = q.queryQSOData(qso)
+            # the user has answered all questions
+            if qso:
+                print ('\n%s%sPlease review your choices%s' % (style.UNDERLINED, q.hlcol, style.RESET))
+                q.printTable(q.getQSODetailTable(qso))
+                # ask user if everything is ok. If not, start over.
+                while True:
+                    answer = input("\n" + q.inputcol + "Is this correct? [" + q.defvalcol +  "y/n/c/quit" + q.inputcol + "]: " + style.RESET)
+                    answer = answer.upper()
+                    if answer == "Y":
+                        logid = q.sendQSO(qso, call)
+                        if logid and logid != "null":
+                            # pull the uploaded QSO from QRZ
+                            result = q.getQSOs("LOGIDS:"+ logid)
+                            if result and result[0]:
+                                q.printTable(q.getQSOTable(result))
+                            done = True
+                            break
+                    elif answer == "C":
+                        done = True
+                        break
+                    elif answer == "N":
+                        break
+                    elif answer == "QUIT":
+                        sys.exit()
+            # the user has entered 'c' during the QSO detail entering process
+            else:
+                done = True
+                continue
 
 
 if __name__ == "__main__":
-    sys.exit(main())
-        
+    try:
+        sys.exit(main())
+    except EOFError:
+        pass
+
