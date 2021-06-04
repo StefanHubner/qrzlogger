@@ -1,53 +1,56 @@
 #!/usr/bin/env python3
 
-#######################################################################
-#                            _                                        # 
-#                __ _ _ _ __| |___  __ _ __ _ ___ _ _                 #
-#               / _` | '_|_ / / _ \/ _` / _` / -_) '_|                #
-#               \__, |_| /__|_\___/\__, \__, \___|_|                  #
-#                  |_|             |___/|___/                         #
-#                                                                     #
-#                                                                     #
-# A python application to log QSOs directly to QRZ.com from the CLI   #
-#                                                                     #
-# Author:           Michael Clemens, DL6MHC (qrzlogger@qrz.is)        #
-#                                                                     # 
-# Documentation:    Please see the README.md file                     #
-# License:          Please see the LICENSE file                       #
-# Repository:       https://github.com/exitnode/qrzlogger             #
-#                                                                     #
-#######################################################################
+# pylint: disable=W1401
 
+"""
++---------------------------------------------------------------------+
+|                            _                                        |
+|                __ _ _ _ __| |___  __ _ __ _ ___ _ _                 |
+|               / _` | '_|_ / / _ \/ _` / _` / -_) '_|                |
+|               \__, |_| /__|_\___/\__, \__, \___|_|                  |
+|                  |_|             |___/|___/                         |
+|                                                                     |
+|                                                                     |
+| A python application to log QSOs directly to QRZ.com from the CLI   |
+|                                                                     |
+| Author:           Michael Clemens, DL6MHC (qrzlogger@qrz.is)        |
+|                                                                     |
+| Documentation:    Please see the README.md file                     |
+| License:          Please see the LICENSE file                       |
+| Repository:       https://github.com/exitnode/qrzlogger             |
+|                                                                     |
++---------------------------------------------------------------------+
+"""
 
-import requests
 import urllib
 import re
 import datetime
 import os
 import sys
-import xmltodict
-from prettytable import PrettyTable
-from requests.structures import CaseInsensitiveDict
-from datetime import date
-from datetime import timezone
 import configparser
-from colored import fore, back, style
 import signal
 import atexit
+from datetime import timezone
+from colored import attr, fg
+from requests.structures import CaseInsensitiveDict
+from prettytable import PrettyTable
+import xmltodict
+import requests
 
 
 class QRZLogger():
+    """QRZLogger class"""
 
-    # initialize things
     def __init__(self):
+        """initialize things"""
 
-        self.version = "0.6.6"
+        self.version = "0.6.7"
 
         # Define the configuration object
         self.config = configparser.ConfigParser()
         self.config_file = os.path.expanduser('~/.qrzlogger.ini')
 
-        self.readConfig(self.config, self.config_file)
+        self.read_config(self.config, self.config_file)
 
         if self.config and self.config['log']['log_file']:
             self.log_file = self.config['log']['log_file']
@@ -64,45 +67,49 @@ class QRZLogger():
         self.headers["Content-Type"] = "application/x-www-form-urlencoded"
 
         # Default colors
-        self.inputcol = style.RESET
-        self.hlcol = style.RESET
-        self.defvalcol = style.RESET
-        self.errorcol = style.RESET
-        self.successcol = style.RESET
-        self.tablecol = style.RESET
-        self.logocol = style.RESET
+        self.inputcol = attr('reset')
+        self.hlcol = attr('reset')
+        self.defvalcol = attr('reset')
+        self.errorcol = attr('reset')
+        self.successcol = attr('reset')
+        self.tablecol = attr('reset')
+        self.logocol = attr('reset')
+
+        self.qso = None
 
         # read colors from config and overwrite default vaulues
-        self.configColors()
+        self.config_colors()
 
 
-    # print an awesome banner
-    def printBanner(self):
-        v = self.version
+    def print_banner(self):
+        """print an awesome banner"""
+        ver = self.version
+        # print the banner
         print(self.logocol)
         print("              _                        ")
         print("  __ _ _ _ __| |___  __ _ __ _ ___ _ _ ")
         print(" / _` | '_|_ / / _ \/ _` / _` / -_) '_|")
         print(" \__, |_| /__|_\___/\__, \__, \___|_|  ")
-        print("    |_| -=DL6MHC=-  |___/|___/ v"+v+"  ")
-        print(style.RESET)
+        print("    |_| -=DL6MHC=-  |___/|___/ v"+ver+"  ")
+        print(attr('reset'))
 
 
-    # Read color settings from config file
-    def configColors(self):
+    def config_colors(self):
+        """Read color settings from config file"""
         if self.config and self.config['colors']['use_colors'] == "yes":
-            self.inputcol = eval(self.config['colors']['inputcol'])
-            self.hlcol = eval(self.config['colors']['hlcol'])
-            self.defvalcol = eval(self.config['colors']['defvalcol'])
-            self.errorcol = eval(self.config['colors']['errorcol'])
-            self.successcol = eval(self.config['colors']['successcol'])
-            self.tablecol = eval(self.config['colors']['tablecol'])
-            self.logocol = eval(self.config['colors']['logocol'])
+            self.inputcol = fg(self.config['colors']['inputcol'])
+            self.hlcol = fg(self.config['colors']['hlcol'])
+            self.defvalcol = fg(self.config['colors']['defvalcol'])
+            self.errorcol = fg(self.config['colors']['errorcol'])
+            self.successcol = fg(self.config['colors']['successcol'])
+            self.tablecol = fg(self.config['colors']['tablecol'])
+            self.logocol = fg(self.config['colors']['logocol'])
 
 
-    # reads the configuration from the config file or
-    # creates a default config file if none could be found
-    def readConfig(self, config, file_name):
+    @staticmethod
+    def read_config(config, file_name):
+        """reads the configuration from the config file or
+        creates a default config file if none could be found"""
         if os.path.isfile(file_name):
             config.read(file_name)
         else:
@@ -112,7 +119,8 @@ class QRZLogger():
                 'api_key': '1234-ABCD-1234-A1B2',
                 'qrz_user': 'MYCALL',
                 'qrz_pass': 'my_secret_password',
-                'xml_fields': '("call", "band", "mode", "qso_date", "time_on", "rst_sent", "rst_rcvd", "comment")'}
+                'xml_fields': '("call", "band", "mode", "qso_date",\
+                        "time_on", "rst_sent", "rst_rcvd", "comment")'}
             config['log'] = {
                 'log_file': '/tmp/qrzlogger.log'}
             config['qso_defaults'] = {
@@ -123,13 +131,13 @@ class QRZLogger():
                 'tx_pwr': '5'}
             config['colors'] = {
                 'use_colors': 'yes',
-                'inputcol': 'fore.YELLOW',
-                'hlcol': 'fore.YELLOW',
-                'defvalcol': 'fore.LIGHT_BLUE',
-                'errorcol': 'fore.RED',
-                'successcol': 'fore.GREEN',
-                'tablecol': 'fore.LIGHT_BLUE',
-                'logocol': 'fore.YELLOW'}
+                'inputcol': 'yellow',
+                'hlcol': 'yellow',
+                'defvalcol': 'light_blue',
+                'errorcol': 'red',
+                'successcol': 'green',
+                'tablecol': 'light_blue',
+                'logocol': 'yellow'}
             config['bandfreqs'] = {
                 '160m': '1.850',
                 '80m': '3.700',
@@ -145,31 +153,36 @@ class QRZLogger():
                 '2m': '145.500',
                 '70cm': '432.300'
                 }
-                
+
             with open(file_name, 'w') as configfile:
-              config.write(configfile) 
+                config.write(configfile)
             print("\nNo configuration file found. A new configuration file has been created.")
             print("\nPlease edit the file " + file_name + " and restart the application.\n" )
-            quit()
+            sys.exit()
         return config
 
 
-    # returns the actual call sign without any indicators
-    # (e.g, "/p" or "F/")
-    def removeIndicators(self, call):
+    @staticmethod
+    def remove_indicators(call):
+        """returns the actual call sign without any indicators
+        (e.g, "/p" or "F/")"""
+
+        # set the return value to the value of "call"
         cleaned_call = call
+        # check if the callsign has a suffix (.e.g. /p)
         if call.endswith(("/P","/M","/QRP")):
             cleaned_call = re.sub(r'/\w$', "",  call)
+        # check if the callsign has a prefix (e.g. DL/)
         if "/" in cleaned_call:
             cleaned_call = re.sub(r'^\w+/', "", cleaned_call)
         return cleaned_call
 
 
-    # Print the table object to stdout
-    def printTable(self, tab):
+    def print_table(self, tab):
+        """Print the table object to stdout"""
         print(self.tablecol)
         print(tab)
-        print(style.RESET)
+        print(attr('reset'))
 
 
 
@@ -177,42 +190,43 @@ class QRZLogger():
     #             QRZ.com API Functions                 #
     #####################################################
 
-    # Generate a session for QRZ.com's xml service with
-    # the help of the QRZ.com username and password
     def get_session(self):
+        """Generate a session for QRZ.com's xml service with
+        the help of the QRZ.com username and password"""
         session_key = None
-        data = { 
+        data = {
             'username' : self.config['qrz.com']['qrz_user'],
             'password' : self.config['qrz.com']['qrz_pass']
             }
 
         try:
             session = requests.Session()
-            session.verify = bool(os.getenv('SSL_VERIFY', True))
-            r = session.post(self.xml_url, data=data)
-            if r.status_code == 200:
-                raw_session = xmltodict.parse(r.content)
+            session.verify = True
+            result = session.post(self.xml_url, data=data)
+            if result.status_code == 200:
+                raw_session = xmltodict.parse(result.content)
                 if raw_session.get('QRZDatabase').get('Session').get('Error'):
                     print(self.errorcol + "\nError while logging into the QRZ.com XML Service:\n")
                     print(raw_session.get('QRZDatabase').get('Session').get('Error'))
-                    print(style.RESET)
+                    print(attr('reset'))
                 session_key = raw_session.get('QRZDatabase').get('Session').get('Key')
                 if session_key:
                     return session_key
         except requests.exceptions.ConnectionError as e_conn:
             print(self.errorcol + "\nUnable to connect to xmldata.qrz.com:")
             print(e_conn)
-            print("\nPlease check if\n * username and password are correct (see config.ini)\n * you are connected to the internet")
-            print(style.RESET)
-        except:
+            print("\nPlease check if\n * username and password are correct \
+                    (see config.ini)\n * you are connected to the internet")
+            print(attr('reset'))
+        except: # pylint: disable=bare-except
             print(self.errorcol + "\nsomething unexpected has happened:\n")
-            print(style.RESET)
+            print(attr('reset'))
         return session_key
 
 
-    # Sends a POST request to QRZ.com, checks for errors
-    # and returns the response
-    def sendRequest(self, post_data):
+    def send_request(self, post_data):
+        """Sends a POST request to QRZ.com, checks for errors
+        and returns the response"""
         try:
             resp = requests.post(self.api_url, headers=self.headers, data=post_data)
             if resp.status_code == 200:
@@ -221,37 +235,39 @@ class QRZLogger():
                 resp_list = response.splitlines()
                 if resp_list[0]:
                     if "invalid api key" in resp_list[0]:
-                        print(self.errorcol + "\nThe API key configured in config.ini is not correct.\n" + style.RESET)
+                        print(self.errorcol + "\nThe API key configured \
+                                in config.ini is not correct.\n" + attr('reset'))
                     else:
                         return response
             elif resp.status_code == 404:
-                print(self.errorcol + "\nThe API URL could not be found. Please check the URL in config.ini\n" + style.RESET)
+                print(self.errorcol + "\nThe API URL could not be found. \
+                        Please check the URL in config.ini\n" + attr('reset'))
         except requests.exceptions.ConnectionError as e_conn:
             print(self.errorcol + "\nUnable to connect to xmldata.qrz.com:")
             print(e_conn)
             print("\nPlease check if you are connected to the internet")
-            print(style.RESET)
-        except:
+            print(attr('reset'))
+        except: # pylint: disable=bare-except
             print(self.errorcol + "\nsomething unexpected has happened:\n")
             print(e_conn)
-            print(style.RESET)
+            print(attr('reset'))
         return None
 
 
-    # Query QRZ.com's xml api to gather information
-    # about a specific call sign
-    def getCallData(self, call, session_key):
+    def get_call_data(self, call, session_key):
+        """Query QRZ.com's xml api to gather information
+        about a specific call sign"""
 
-        data = { 
+        data = {
             's' : session_key,
             'callsign' : call
             }
 
         try:
             session = requests.Session()
-            session.verify = bool(os.getenv('SSL_VERIFY', True))
-            r = session.post(self.xml_url, data=data)
-            raw = xmltodict.parse(r.content).get('QRZDatabase')
+            session.verify = True
+            result = session.post(self.xml_url, data=data)
+            raw = xmltodict.parse(result.content).get('QRZDatabase')
             calldata = raw.get('Callsign')
             if calldata:
                 return calldata
@@ -259,64 +275,65 @@ class QRZLogger():
             print(self.errorcol + "\nUnable to connect to xmldata.qrz.com:")
             print(e_conn)
             print("\nPlease check if you are connected to the internet")
-            print(style.RESET)
-        except:
+            print(attr('reset'))
+        except: # pylint: disable=bare-except
             print(self.errorcol + "\nsomething unexpected has happened:\n")
-            print(style.RESET)
+            print(attr('reset'))
         return None
 
 
-    # Query QRZ.com's logbook for all previous QSOs
-    # with a specific call sign or for a specific
-    # logid
-    def getQSOs(self, option):
-        post_data = { 
+    def get_qsos(self, option):
+        """Query QRZ.com's logbook for all previous QSOs
+        with a specific call sign or for a specific logid"""
+
+        result = [{}]
+        post_data = {
             'KEY' : self.config['qrz.com']['api_key'],
             'ACTION' : 'FETCH',
             'OPTION' : "TYPE:ADIF," + option
             }
         post_data = urllib.parse.urlencode(post_data)
 
-        response = self.sendRequest(post_data)
+        response = self.send_request(post_data)
 
         if response:
             resp_list = response.splitlines()
-            result = [{}]
-            for i in resp_list:
-                if not i:
+            for resp in resp_list:
+                if not resp:
                     result.append({})
                 else:
-                    if any(s+":" in i for s in self.config['qrz.com']['xml_fields']):
-                        i = re.sub('&lt;','',i, flags=re.DOTALL)
-                        i = re.sub(':.*&gt;',":",i, flags=re.DOTALL)
-                        v = re.sub('^.*:',"",i, flags=re.DOTALL)
-                        k = re.sub(':.*$',"",i, flags=re.DOTALL)
-                        result[-1][k] = v
-            return result
-        else:
-            return None
+                    if any(s+":" in resp for s in self.config['qrz.com']['xml_fields']):
+                        resp = re.sub('&lt;','',resp, flags=re.DOTALL)
+                        resp = re.sub(':.*&gt;',":",resp, flags=re.DOTALL)
+                        value = re.sub('^.*:',"",resp, flags=re.DOTALL)
+                        key = re.sub(':.*$',"",resp, flags=re.DOTALL)
+                        result[-1][key] = value
+        return result
 
 
-    # Sends the previously collected QSO information as a new
-    # QRZ.com logbook entry via the API
-    def sendQSO(self, qso, call):
+    def send_qso(self, qso, call):
+        """Sends the previously collected QSO information as a new
+        QRZ.com logbook entry via the API"""
+
         logid = "null"
         log_status = "FAILED:  "
 
         # construct ADIF QSO entry
-        adif = '<station_callsign:' + str(len(self.config['qrz.com']['station_call'])) + '>' + self.config['qrz.com']['station_call']
+        adif = '<station_callsign:' + str(len(self.config['qrz.com']['station_call'])) \
+                + '>' + self.config['qrz.com']['station_call']
         adif += '<call:' + str(len(call)) + '>' + call
         for field in qso:
             adif += '<' + field + ':' + str(len(qso[field][1])) + '>' + qso[field][1]
         adif += '<eor>'
 
         # construct POST data
-        post_data = { 'KEY' : self.config['qrz.com']['api_key'], 'ACTION' : 'INSERT', 'ADIF' : adif }
+        post_data = { 'KEY' : self.config['qrz.com']['api_key'], \
+                'ACTION' : 'INSERT', 'ADIF' : adif }
 
         # URL encode the payload
         data = urllib.parse.urlencode(post_data)
         # send the POST request to QRZ.com
-        response = self.sendRequest(data)
+        response = self.send_request(data)
         # Check if the upload failed and print out
         # the reason plus some additional info
         if response:
@@ -327,22 +344,20 @@ class QRZLogger():
                 for item in resp_list:
                     print(item)
                 print("\nPlease review the following request that led to this error:\n")
-                print(style.RESET)
+                print(attr('reset'))
                 print(post_data)
             else:
                 try:
                     logid = re.search('LOGID=(\d+)', response).group(1)
-                except:
+                except: # pylint: disable=bare-except
                     logid = "null"
                 print(self.successcol)
                 print("QSO successfully uploaded to QRZ.com (LOGID "+ logid + ")")
                 log_status = "SUCCESS: "
-                print(style.RESET)
+                print(attr('reset'))
             with open(self.log_file, "a") as log:
                 log.write(log_status + adif + "\n")
-            return logid
-        else:
-            print(self.errorcol + "\nA critical error occured. Please review all previous output." + style.RESET)
+        return logid
 
 
 
@@ -350,10 +365,12 @@ class QRZLogger():
     #     Functions for generating  ASCII Tables        #
     #####################################################
 
-    # Generate a pretty ascii table containing all
-    # previous QSOs with a specific call sign
-    def getQSOTable(self, result):
-        t = PrettyTable(['Date', 'Time', 'Band', 'Mode', 'RST-S', 'RST-R', 'Power', 'Comment'])
+    @staticmethod
+    def get_qso_table(result):
+        """Generate a pretty ascii table containing all
+        previous QSOs with a specific call sign"""
+
+        table = PrettyTable(['Date', 'Time', 'Band', 'Mode', 'RST-S', 'RST-R', 'Power', 'Comment'])
         for qso in result:
             if "qso_date" in qso:
                 date = datetime.datetime.strptime(qso["qso_date"], '%Y%m%d').strftime('%Y/%m/%d')
@@ -362,85 +379,78 @@ class QRZLogger():
                 for field in ["band", "mode", "rst_sent", "rst_rcvd", "tx_pwr", "comment"]:
                     if field not in qso:
                         qso[field] = ""
-                t.add_row([date, time, qso["band"], qso["mode"], qso["rst_sent"], qso["rst_rcvd"], qso["tx_pwr"], qso["comment"]])
-        t.align = "r"
-        return t
+                table.add_row([date, time, qso["band"], qso["mode"], qso["rst_sent"], \
+                        qso["rst_rcvd"], qso["tx_pwr"], qso["comment"]])
+        table.align = "r"
+        return table
 
 
-    # Print a pretty ascii table containing all interesting
-    # data found for a specific call sign
-    def getXMLQueryTable(self, result):
-        t = PrettyTable(['key', 'value'])
+    @staticmethod
+    def get_xml_query_table(result):
+        """Print a pretty ascii table containing all interesting
+        data found for a specific call sign"""
+
+        table = PrettyTable(['key', 'value'])
         if "fname" in result:
-            t.add_row(["First Name", result["fname"]])
+            table.add_row(["First Name", result["fname"]])
         if "name" in result:
-            t.add_row(["Last Name", result["name"]])
+            table.add_row(["Last Name", result["name"]])
         if "addr1" in result:
-            t.add_row(["Street", result["addr1"]])
+            table.add_row(["Street", result["addr1"]])
         if "addr2" in result:
-            t.add_row(["City", result["addr2"]])
+            table.add_row(["City", result["addr2"]])
         if "state" in result:
-            t.add_row(["State", result["state"]])
+            table.add_row(["State", result["state"]])
         if "country" in result:
-            t.add_row(["Country", result["country"]])
+            table.add_row(["Country", result["country"]])
         if "grid" in result:
-            t.add_row(["Locator", result["grid"]])
+            table.add_row(["Locator", result["grid"]])
         if "email" in result:
-            t.add_row(["Email", result["email"]])
+            table.add_row(["Email", result["email"]])
         if "qslmgr" in result:
-            t.add_row(["QSL via:", result["qslmgr"]])
-        t.align = "l"
-        t.header = False    
-        return t
+            table.add_row(["QSL via:", result["qslmgr"]])
+        table.align = "l"
+        table.header = False
+        return table
 
 
-    # Print a pretty ascii table containing all
-    # previously entered user data
-    def getQSODetailTable(self, qso):
-        t = PrettyTable(['key', 'value'])
-        for q in qso:
-            t.add_row([qso[q][0], qso[q][1]])
-        t.align = "l"
-        t.header = False    
-        return t
+    @staticmethod
+    def get_qso_detail_table(qso):
+        """Print a pretty ascii table containing all
+        previously entered user data"""
 
+        table = PrettyTable(['key', 'value'])
+        for item in qso:
+            table.add_row([qso[item][0], qso[item][1]])
+        table.align = "l"
+        table.header = False
+        return table
 
 
     #####################################################
     #          User Interaction Functions               #
     #####################################################
 
-    # Queries QSO specific data from the user via
-    # the command line
-    def queryQSOData(self, qso):
-        dt = datetime.datetime.now(timezone.utc)
-        dt_now = dt.replace(tzinfo=timezone.utc)
+    def query_qso_data(self, qso):
+        """Queries QSO specific data from the user via
+        the command line"""
 
-        # pre-fill the fields with date, time and
-        # default values from the config file
-        qso_date = dt_now.strftime("%Y%m%d")
-        time_on = dt_now.strftime("%H%M")
-        band = self.config['qso_defaults']['band']
-        freq = ""
-        mode = self.config['qso_defaults']['mode']
-        rst_rcvd = self.config['qso_defaults']['rst_rcvd']
-        rst_sent = self.config['qso_defaults']['rst_sent']
-        tx_pwr = self.config['qso_defaults']['tx_pwr']
-        comment = ""
+        date_time = datetime.datetime.now(timezone.utc)
+        dt_now = date_time.replace(tzinfo=timezone.utc)
 
         # If this is the first try filling out the QSO fields
         # then we use defaults
         if qso is None:
             questions = {
-                "qso_date" : ["QSO Date",qso_date],
-                "time_on": ["QSO Time", time_on],
-                "band": ["Band", band],
-                "freq": ["Frequency", freq],
-                "mode": ["Mode", mode],
-                "rst_rcvd": ["RST Received", rst_rcvd],
-                "rst_sent": ["RST Sent", rst_sent],
-                "tx_pwr": ["Power (in W)", tx_pwr],
-                "comment": ["Comment", comment]
+                "qso_date" : ["QSO Date", dt_now.strftime("%Y%m%d")],
+                "time_on": ["QSO Time", dt_now.strftime("%H%M")],
+                "band": ["Band", self.config['qso_defaults']['band']],
+                "freq": ["Frequency", ""],
+                "mode": ["Mode", self.config['qso_defaults']['mode']],
+                "rst_rcvd": ["RST Received", self.config['qso_defaults']['rst_rcvd']],
+                "rst_sent": ["RST Sent", self.config['qso_defaults']['rst_sent']],
+                "tx_pwr": ["Power (in W)", self.config['qso_defaults']['tx_pwr']],
+                "comment": ["Comment", ""]
                 }
         # if this is not the first try, we pre-fill the
         # vaulues we got from the last try
@@ -449,8 +459,9 @@ class QRZLogger():
 
         # We now loop through all defined fields and ask
         # the user for input
-        for q in questions:
-            txt = self.inputcol + questions[q][0] + " [" + self.defvalcol + questions[q][1] + self.inputcol + "]:" + style.RESET
+        for question in questions:
+            txt = self.inputcol + questions[question][0] + " [" + self.defvalcol \
+                    + questions[question][1] + self.inputcol + "]:" + attr('reset')
             inp = input(txt)
             # If the user just hits enter, we keep the default value.
             # If not, we keep the data provided by the user
@@ -459,26 +470,72 @@ class QRZLogger():
             if inp == "quit":
                 sys.exit()
             if inp != "":
-                questions[q][1] = inp
+                questions[question][1] = inp
             # check if we are asking for the band
-            if q == "band":
+            if question == "band":
                 # check if the band is in the bandfreqs dictionary
                 try:
                     # populate the frequency with a common freq of this band
                     bandfreqs = dict(self.config.items('bandfreqs'))
-                    questions['freq'][1] = bandfreqs[questions[q][1]]
-                except:
-                    print(self.errorcol + "\nUnable to read default frequency values from config file." + style.RESET)
+                    questions['freq'][1] = bandfreqs[questions[question][1]]
+                except: # pylint: disable=bare-except
+                    print(self.errorcol + "\nUnable to read default frequency \
+                            values from config file." + attr('reset'))
 
         return questions
 
+    def get_input_callsign(self):
+        """query a call sign from the user"""
+        call = ""
+        while True:
+            call = input("\n\n%sEnter Callsign:%s " % (self.inputcol, attr('reset')))
+            if call == "quit":
+                sys.exit()
+            # check if it has the format of a valid call sign
+            # (at least 3 characters, only alphanumeric and slashes)
+            if not (len(call) > 2 and call.replace("/", "").isalnum()):
+                print(self.errorcol + "\nPlease enter a callsign with\n * at least \
+                        3 characters\n * only letters, numbers and slashes" + attr('reset'))
+                continue
+            # make the call sign all upper case
+            call = call.upper()
+            break
+        return call
 
-def handler(signum, frame):
+
+    def confirm_and_submit_qso(self, call):
+        """ask user if everything is ok. If not, start over."""
+        done = False
+        while True:
+            answer = input("\n" + self.inputcol + "Is this correct? [" + \
+                    self.defvalcol +  "y/n/c/quit" + self.inputcol + "]: " + attr('reset'))
+            answer = answer.upper()
+            if answer == "Y":
+                logid = self.send_qso(self.qso, call)
+                if logid and logid != "null":
+                    # pull the uploaded QSO from QRZ
+                    result = self.get_qsos("LOGIDS:"+ logid)
+                    if result and result[0]:
+                        self.print_table(self.get_qso_table(result))
+                    done = True
+                    break
+            elif answer == "C":
+                done = True
+                break
+            elif answer == "N":
+                break
+            elif answer == "QUIT":
+                sys.exit()
+        return done
+
+
+def handler(signum, frame): # pylint: disable=W0613
+    """method for handlich SIGINTs"""
     return None
 
 
-# Prints a message when the application is terminated
 def quit_gracefully():
+    """Prints a message when the application is terminated"""
     print("\n73!\n")
 
 
@@ -488,12 +545,14 @@ def quit_gracefully():
 #####################################################
 
 def main():
+    """the main routine"""
 
+    # signal handling for ctrl+c and ctrl+d
     signal.signal(signal.SIGINT, handler)
     atexit.register(quit_gracefully)
 
-    q = QRZLogger()
-    q.printBanner()
+    qrz = QRZLogger()
+    qrz.print_banner()
 
     keeponlogging = True
     session_key = None
@@ -501,82 +560,59 @@ def main():
     # Begin the main loop
     while keeponlogging:
         # get a session after logging into QRZ with user/pass
-        session_key = q.get_session()
+        session_key = qrz.get_session()
         # query a call sign from the user
-        call = input("\n\n%sEnter Callsign:%s " % (q.inputcol, style.RESET))
-        if call == "quit":
-            sys.exit()
-        # check if it has the format of a valid call sign
-        # (at least 3 characters, only alphanumeric and slashes)
-        if not (len(call) > 2 and call.replace("/", "").isalnum()):
-            print(q.errorcol + "\nPlease enter a callsign with\n * at least 3 characters\n * only letters, numbers and slashes" + style.RESET)
-            continue
-        # make the call sign all upper case
-        call = call.upper()
+        call = qrz.get_input_callsign()
         # query call sign data from QRZ
-        result = q.getCallData(call, session_key)
+        result = qrz.get_call_data(call, session_key)
         # the query was successful
         if result:
-            print ('\n%s%sQRZ.com results for %s%s' % (style.UNDERLINED, q.hlcol, call, style.RESET))
+            print ('\n%s%sQRZ.com results for %s%s' \
+                    % (attr('underlined'), qrz.hlcol, call, attr('reset')))
             # generate a nice ascii table with the result
-            q.printTable(q.getXMLQueryTable(result))
+            qrz.print_table(qrz.get_xml_query_table(result))
         # the query was unsuccessful
         else:
-            print ('\n%s%s has no record on QRZ.com ¯\_(ツ)_/¯%s' % (q.errorcol, call, style.RESET))
-            cleaned_call = q.removeIndicators(call)
+            print ('\n%s%s has no record on QRZ.com ¯\_(ツ)_/¯%s' \
+                    % (qrz.errorcol, call, attr('reset')))
+            cleaned_call = qrz.remove_indicators(call)
             if call != cleaned_call:
                 # query call sign data from QRZ
-                result = q.getCallData(cleaned_call, session_key)
+                result = qrz.get_call_data(cleaned_call, session_key)
                 # the query was successful
                 if result:
-                    print ('\n%s%sShowing results for %s instead%s' % (style.UNDERLINED, q.hlcol, cleaned_call, style.RESET))
+                    print ('\n%s%sShowing results for %s instead%s' \
+                            % (attr('underlined'), qrz.hlcol, cleaned_call, attr('reset')))
                     # generate a nice ascii table with the result
-                    q.printTable(q.getXMLQueryTable(result))
+                    qrz.print_table(qrz.get_xml_query_table(result))
             print("")
         # pull all previous QSOs from tzhe QRZ logbook
-        result = q.getQSOs("CALL:"+ call)
+        result = qrz.get_qsos("CALL:"+ call)
         # ignore this part if there were no previous QSOs
         if result and result[0]:
-            print ('%s%sPrevious QSOs with %s%s' % (style.UNDERLINED, q.hlcol, call, style.RESET))
-            q.printTable(q.getQSOTable(result))
+            print ('%s%sPrevious QSOs with %s%s' \
+                    % (attr('underlined'), qrz.hlcol, call, attr('reset')))
+            qrz.print_table(qrz.get_qso_table(result))
 
-        print ('%s%sEnter new QSO details below%s%s (enter \'c\' to cancel)%s\n' % (style.UNDERLINED, q.hlcol, style.RESET, q.hlcol, style.RESET,))
+        print ('%s%sEnter new QSO details below%s%s (enter \'c\' to cancel)%s\n' \
+                % (attr('underlined'), qrz.hlcol, attr('reset'), qrz.hlcol, attr('reset'),))
 
         done = False
-        qso = None
 
         # we now ask the user for QSO details until he/she is happy with the result
-        resume = True
         while not done:
             # query QSO details from the user
-            qso = q.queryQSOData(qso)
+            qrz.qso = qrz.query_qso_data(qrz.qso)
             # the user has answered all questions
-            if qso:
-                print ('\n%s%sPlease review your choices%s' % (style.UNDERLINED, q.hlcol, style.RESET))
-                q.printTable(q.getQSODetailTable(qso))
-                # ask user if everything is ok. If not, start over.
-                while True:
-                    answer = input("\n" + q.inputcol + "Is this correct? [" + q.defvalcol +  "y/n/c/quit" + q.inputcol + "]: " + style.RESET)
-                    answer = answer.upper()
-                    if answer == "Y":
-                        logid = q.sendQSO(qso, call)
-                        if logid and logid != "null":
-                            # pull the uploaded QSO from QRZ
-                            result = q.getQSOs("LOGIDS:"+ logid)
-                            if result and result[0]:
-                                q.printTable(q.getQSOTable(result))
-                            done = True
-                            break
-                    elif answer == "C":
-                        done = True
-                        break
-                    elif answer == "N":
-                        break
-                    elif answer == "QUIT":
-                        sys.exit()
+            if qrz.qso:
+                print ('\n%s%sPlease review your choices%s' \
+                        % (attr('underlined'), qrz.hlcol, attr('reset')))
+                qrz.print_table(qrz.get_qso_detail_table(qrz.qso))
+                done = qrz.confirm_and_submit_qso(call)
             # the user has entered 'c' during the QSO detail entering process
             else:
                 done = True
+                qrz.qso = None
                 continue
 
 
@@ -585,4 +621,3 @@ if __name__ == "__main__":
         sys.exit(main())
     except EOFError:
         pass
-
