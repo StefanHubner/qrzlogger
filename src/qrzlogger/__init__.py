@@ -1,3 +1,3 @@
 from qrzlogger.__main__ import QRZLogger
 
-__version__ = '0.6.8'
+__version__ = '0.6.7'
