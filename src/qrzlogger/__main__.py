@@ -44,7 +44,7 @@ class QRZLogger():
     def __init__(self):
         """initialize things"""
 
-        self.version = "0.6.7"
+        self.version = "0.6.8"
 
         # Define the configuration object
         self.config = configparser.ConfigParser()
