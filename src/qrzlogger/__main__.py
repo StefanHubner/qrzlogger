@@ -76,6 +76,7 @@ class QRZLogger():
         self.logocol = attr('reset')
 
         self.qso = None
+        self.recent_qso_limit = 5
 
         # read colors from config and overwrite default vaulues
         self.config_colors()
@@ -427,6 +428,20 @@ class QRZLogger():
         return table
 
 
+    @staticmethod
+    def get_recent_qso_table(recent_qsos):
+        """Print a pretty ascii table containing 
+        the n previous QSOs"""
+
+        table = PrettyTable(['Time', 'Frequency', 'Call'])
+        for hist_qso in recent_qsos:
+            table.add_row([hist_qso[1], hist_qso[2], hist_qso[0]])
+
+        table.align = "l"
+        table.header = True
+        return table
+
+
     #####################################################
     #          User Interaction Functions               #
     #####################################################
@@ -529,6 +544,7 @@ class QRZLogger():
         return done
 
 
+
 def handler(signum, frame): # pylint: disable=W0613
     """method for handlich SIGINTs"""
     return None
@@ -557,10 +573,19 @@ def main():
     keeponlogging = True
     session_key = None
 
+    recent_qsos = []
+
     # Begin the main loop
     while keeponlogging:
         # get a session after logging into QRZ with user/pass
         session_key = qrz.get_session()
+        qrz.qso = None
+        # print a table containing the last n logged QSOs
+        if recent_qsos:
+            print ('\n%s%sYour last %s logged QSOs%s' \
+                    % (attr('underlined'), qrz.hlcol, \
+                    qrz.recent_qso_limit, attr('reset')))
+            qrz.print_table(qrz.get_recent_qso_table(recent_qsos))
         # query a call sign from the user
         call = qrz.get_input_callsign()
         # query call sign data from QRZ
@@ -614,6 +639,10 @@ def main():
                 done = True
                 qrz.qso = None
                 continue
+        # add some of the QSO detail to the recent_qsos list
+        recent_qsos.append([call, qrz.qso["time_on"][1], qrz.qso["freq"][1]])
+        if len(recent_qsos)>qrz.recent_qso_limit:
+            recent_qsos.pop(0)
 
 
 if __name__ == "__main__":
