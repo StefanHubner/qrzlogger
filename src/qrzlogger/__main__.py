@@ -634,15 +634,15 @@ def main():
                         % (attr('underlined'), qrz.hlcol, attr('reset')))
                 qrz.print_table(qrz.get_qso_detail_table(qrz.qso))
                 done = qrz.confirm_and_submit_qso(call)
+                # add some of the QSO detail to the recent_qsos list
+                recent_qsos.append([call, qrz.qso["time_on"][1], qrz.qso["freq"][1]])
+                if len(recent_qsos)>qrz.recent_qso_limit:
+                    recent_qsos.pop(0)
             # the user has entered 'c' during the QSO detail entering process
             else:
                 done = True
                 qrz.qso = None
                 continue
-        # add some of the QSO detail to the recent_qsos list
-        recent_qsos.append([call, qrz.qso["time_on"][1], qrz.qso["freq"][1]])
-        if len(recent_qsos)>qrz.recent_qso_limit:
-            recent_qsos.pop(0)
 
 
 if __name__ == "__main__":
