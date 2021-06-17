@@ -77,6 +77,7 @@ class QRZLogger():
 
         self.qso = None
         self.recent_qso_limit = 5
+        self.recent_qsos = []
 
         # read colors from config and overwrite default vaulues
         self.config_colors()
@@ -532,6 +533,10 @@ class QRZLogger():
                     result = self.get_qsos("LOGIDS:"+ logid)
                     if result and result[0]:
                         self.print_table(self.get_qso_table(result))
+                        # add some of the QSO detail to the recent_qsos list
+                        self.recent_qsos.append([call, self.qso["time_on"][1], self.qso["freq"][1]])
+                        if len(self.recent_qsos)>self.recent_qso_limit:
+                            self.recent_qsos.pop(0)
                     done = True
                     break
             elif answer == "C":
@@ -573,7 +578,6 @@ def main():
     keeponlogging = True
     session_key = None
 
-    recent_qsos = []
 
     # Begin the main loop
     while keeponlogging:
@@ -581,11 +585,11 @@ def main():
         session_key = qrz.get_session()
         qrz.qso = None
         # print a table containing the last n logged QSOs
-        if recent_qsos:
+        if qrz.recent_qsos:
             print ('\n%s%sYour last %s logged QSOs%s' \
                     % (attr('underlined'), qrz.hlcol, \
                     qrz.recent_qso_limit, attr('reset')))
-            qrz.print_table(qrz.get_recent_qso_table(recent_qsos))
+            qrz.print_table(qrz.get_recent_qso_table(qrz.recent_qsos))
         # query a call sign from the user
         call = qrz.get_input_callsign()
         # query call sign data from QRZ
@@ -634,10 +638,12 @@ def main():
                         % (attr('underlined'), qrz.hlcol, attr('reset')))
                 qrz.print_table(qrz.get_qso_detail_table(qrz.qso))
                 done = qrz.confirm_and_submit_qso(call)
+                '''
                 # add some of the QSO detail to the recent_qsos list
                 recent_qsos.append([call, qrz.qso["time_on"][1], qrz.qso["freq"][1]])
                 if len(recent_qsos)>qrz.recent_qso_limit:
                     recent_qsos.pop(0)
+                '''
             # the user has entered 'c' during the QSO detail entering process
             else:
                 done = True
