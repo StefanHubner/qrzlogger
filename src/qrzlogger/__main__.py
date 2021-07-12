@@ -351,11 +351,14 @@ class QRZLogger():
             else:
                 try:
                     logid = re.search('LOGID=(\d+)', response).group(1)
+                    print(self.successcol)
+                    print("QSO successfully uploaded to QRZ.com (LOGID "+ logid + ")")
+                    log_status = "SUCCESS: "
+                    print(attr('reset'))
                 except: # pylint: disable=bare-except
                     logid = "null"
-                print(self.successcol)
-                print("QSO successfully uploaded to QRZ.com (LOGID "+ logid + ")")
-                log_status = "SUCCESS: "
+                    print(self.errorcol)
+                    print("\nQSO upload to QRZ.com failed!\n")
                 print(attr('reset'))
             with open(self.log_file, "a") as log:
                 log.write(log_status + adif + "\n")
@@ -528,7 +531,7 @@ class QRZLogger():
             answer = answer.upper()
             if answer == "Y":
                 logid = self.send_qso(self.qso, call)
-                if logid and logid != "null":
+                if logid and logid.lower() != "null":
                     # pull the uploaded QSO from QRZ
                     result = self.get_qsos("LOGIDS:"+ logid)
                     if result and result[0]:
