@@ -1,3 +1,10 @@
+This project has moved here: https://git.qrz.is/clemens/qrzlogger
+
+
+
+
+
+
 # qrzlogger
 
 This script is a QRZ.com command line QSO logger.
