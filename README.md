@@ -1,4 +1,4 @@
-This project has moved here: https://git.qrz.is/clemens/qrzlogger
+__This project has moved here: https://git.qrz.is/clemens/qrzlogger__
 
 
 
