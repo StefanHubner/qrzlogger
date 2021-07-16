@@ -1,10 +1,3 @@
-__=> This project has moved here: https://git.qrz.is/clemens/qrzlogger <=__
-
-
-
-
-
-
 # qrzlogger
 
 This script is a QRZ.com command line QSO logger.
