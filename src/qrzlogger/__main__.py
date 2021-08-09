@@ -336,6 +336,7 @@ class QRZLogger():
         data = urllib.parse.urlencode(post_data)
         # send the POST request to QRZ.com
         response = self.send_request(data)
+
         # Check if the upload failed and print out
         # the reason plus some additional info
         if response:
@@ -530,7 +531,17 @@ class QRZLogger():
                     self.defvalcol +  "y/n/c/quit" + self.inputcol + "]: " + attr('reset'))
             answer = answer.upper()
             if answer == "Y":
-                logid = self.send_qso(self.qso, call)
+                while True:
+                    logid = self.send_qso(self.qso, call)
+                    if logid and logid != "null":
+                        break
+                    else:
+                        answer = input("\n" + self.inputcol + "QSO Upload failed. Retry? [" + \
+                                self.defvalcol +  "y/n" + self.inputcol + "]: " + attr('reset'))
+                        answer = answer.upper()
+                        if answer == "N":
+                            done = True
+                            break
                 if logid and logid.lower() != "null":
                     # pull the uploaded QSO from QRZ
                     result = self.get_qsos("LOGIDS:"+ logid)
@@ -541,6 +552,8 @@ class QRZLogger():
                         if len(self.recent_qsos)>self.recent_qso_limit:
                             self.recent_qsos.pop(0)
                     done = True
+                    break
+                else:
                     break
             elif answer == "C":
                 done = True
