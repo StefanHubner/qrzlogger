@@ -376,17 +376,17 @@ class QRZLogger():
         """Generate a pretty ascii table containing all
         previous QSOs with a specific call sign"""
 
-        table = PrettyTable(['Date', 'Time', 'Band', 'Mode', 'RST-S', 'RST-R', 'Power', 'Comment'])
+        table = PrettyTable(['Date', 'Time', 'Band', 'Mode', 'RST-S', 'RST-R', 'Power', 'QRZ', 'LotW', 'Comment'])
         for qso in result:
             if "qso_date" in qso:
                 date = datetime.datetime.strptime(qso["qso_date"], '%Y%m%d').strftime('%Y/%m/%d')
                 time = datetime.datetime.strptime(qso["time_on"], '%H%M').strftime('%H:%M')
                 # add missing fields to dict
-                for field in ["band", "mode", "rst_sent", "rst_rcvd", "tx_pwr", "comment"]:
+                for field in ["band", "mode", "rst_sent", "rst_rcvd", "tx_pwr", "app_qrzlog_status", "lotw_qsl_rcvd", "comment"]:
                     if field not in qso:
                         qso[field] = ""
                 table.add_row([date, time, qso["band"], qso["mode"], qso["rst_sent"], \
-                        qso["rst_rcvd"], qso["tx_pwr"], qso["comment"]])
+                        qso["rst_rcvd"], qso["tx_pwr"], qso["app_qrzlog_status"], qso["lotw_qsl_rcvd"], qso["comment"]])
         table.align = "r"
         return table
 
