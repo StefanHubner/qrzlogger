@@ -87,7 +87,9 @@ class QRZLogger():
         self.config_colors()
 
         self.rig = None
+        self.connect_rig()
 
+    def connect_rig(self):
         # Open a communication channel to the radio.
         try:
             Hamlib.rig_set_debug(Hamlib.RIG_DEBUG_NONE)
@@ -96,6 +98,7 @@ class QRZLogger():
             self.rig.open()
         except:
             print("rig error")
+            return
 
 
     def print_banner(self):
