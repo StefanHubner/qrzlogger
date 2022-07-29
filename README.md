@@ -42,14 +42,14 @@ To download or update qrzlogger, clone the repo:
 
 # Usage
 
- * execute the application with "python3 qrzlogger"
+ * execute the application with "python3 qrzlogger.py"
  * qrzlogger creates a default config file and states its location (e.g. _~/.qrzlogger.ini_)
  * adapt _~/.qrzlogger.ini_ to your needs. Important setting are:
     * station_call: This is your station call (must match with the QRZ.com logbook)
     * api_key: Your QRZ.com API key. You find it under "settings" in the QRZ.com logbook'
     * qrz_user: Your QRZ.com user name, typically your call sign'
     * qrz_pass: Your QRZ.com password (not the API key)'
- * execute the application again with "python3 qrzlogger"
+ * execute the application again with "python3 qrzlogger.py"
 
 # License
 
