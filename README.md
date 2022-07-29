@@ -25,36 +25,31 @@ qrzlogger needs Python 3 and the following libraries:
 
 Furthermore, you need at least the XML subscription from QRZ.com.
 
-Before installing qrzlogger, please make sure that pip, setuptools and wheel are installed and up-to-date:
+Before installing qrzlogger, please make sure that the above mentioned libraries have been installed:
 
 ```
-# python3 -m pip install --upgrade pip setuptools wheel
+# python3 -m pip install xmltodict
+# python3 -m pip install prettytable
+# python3 -m pip install colored
+# python3 -m pip install requests
 ```
 
-Finally, install qrzlogger with pip:
+To download or update qrzlogger, clone the repo:
 
 ```
-# python3 -m pip install qrzlogger
-```
-
-# Updating
-
-To update qrzlogger, execute the following command:
-
-```
-# python3 -m pip install --upgrade qrzlogger
+# git clone https://codeberg.org/mclemens/qrzlogger.git
 ```
 
 # Usage
 
- * execute the application with "qrzlogger"
+ * execute the application with "python3 qrzlogger"
  * qrzlogger creates a default config file and states its location (e.g. _~/.qrzlogger.ini_)
  * adapt _~/.qrzlogger.ini_ to your needs. Important setting are:
     * station_call: This is your station call (must match with the QRZ.com logbook)
     * api_key: Your QRZ.com API key. You find it under "settings" in the QRZ.com logbook'
     * qrz_user: Your QRZ.com user name, typically your call sign'
     * qrz_pass: Your QRZ.com password (not the API key)'
- * execute the application again with "qrzlogger"
+ * execute the application again with "python3 qrzlogger"
 
 # License
 
