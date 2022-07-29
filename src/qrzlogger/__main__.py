@@ -13,7 +13,7 @@
 |                                                                     |
 | A python application to log QSOs directly to QRZ.com from the CLI   |
 |                                                                     |
-| Author:           Michael Clemens, DL6MHC (qrzlogger@qrz.is)        |
+| Author:           Michael Clemens, DK1MI (qrzlogger@qrz.is)         |
 |                                                                     |
 | Documentation:    Please see the README.md file                     |
 | License:          Please see the LICENSE file                       |
@@ -110,7 +110,7 @@ class QRZLogger():
         print("  __ _ _ _ __| |___  __ _ __ _ ___ _ _ ")
         print(" / _` | '_|_ / / _ \/ _` / _` / -_) '_|")
         print(" \__, |_| /__|_\___/\__, \__, \___|_|  ")
-        print("    |_| -=DL6MHC=-  |___/|___/ v"+ver+"  ")
+        print("    |_|  -=DK1MI=-  |___/|___/ v"+ver+"  ")
         print(attr('reset'))
 
 
