@@ -12,7 +12,7 @@ It does the following:
 
 # Screnshot
 
-![screenshot](/screenshot.jpg?raw=true "screenshot")
+![screenshot](/screenshot_0.8.1.jpg?raw=true "screenshot")
 
 # Installation
 
