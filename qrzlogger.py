@@ -36,10 +36,6 @@ from requests.structures import CaseInsensitiveDict
 from prettytable import PrettyTable
 import xmltodict
 import requests
-try:
-    import Hamlib
-except ModuleNotFoundError:
-    print("")
 
 
 class QRZLogger():
@@ -86,21 +82,6 @@ class QRZLogger():
         # read colors from config and overwrite default vaulues
         self.config_colors()
 
-        self.rig = None
-        self.connect_rig()
-
-    def connect_rig(self):
-        # Open a communication channel to the radio.
-        try:
-            Hamlib.rig_set_debug(Hamlib.RIG_DEBUG_NONE)
-            self.rig = Hamlib.Rig(int(self.config['hamlib']['model']))
-            self.rig.set_conf("rig_pathname", self.config['hamlib']['pathname'])
-            self.rig.open()
-        except:
-            print("rig error")
-            return
-
-
     def print_banner(self):
         """print an awesome banner"""
         ver = self.version
@@ -143,9 +124,6 @@ class QRZLogger():
                         "time_on", "rst_sent", "rst_rcvd", "comment")'}
             config['log'] = {
                 'log_file': '/tmp/qrzlogger.log'}
-            config['hamlib'] = {
-                'model': 'RIG_MODEL_IC7300',
-                'pathname': '/dev/ttyUSB0'}
             config['qso_defaults'] = {
                 'band': '40m',
                 'mode': 'SSB',
@@ -498,6 +476,7 @@ class QRZLogger():
         elif bandfreq == "50":
             return "6m"
 
+
     def query_qso_data(self, qso):
         """Queries QSO specific data from the user via
         the command line"""
@@ -519,14 +498,6 @@ class QRZLogger():
                 "tx_pwr": ["Power (in W)", self.config['qso_defaults']['tx_pwr']],
                 "comment": ["Comment", ""]
                 }
-            if self.rig is not None:
-                questions["freq"][1] = "%.3f" % (self.rig.get_freq()/1.0e6)
-                (mode, width) = self.rig.get_mode()
-                questions["mode"][1] = Hamlib.rig_strrmode(mode)
-                questions["band"][1] = self.get_band_from_freq(questions["freq"][1])
-                #questions["tx_pwr"][1] = self.rig.get_level(Hamlib.RIG_LEVEL_RFPOWER)
-
-
         # if this is not the first try, we pre-fill the
         # vaulues we got from the last try
         else:
@@ -547,7 +518,7 @@ class QRZLogger():
             if inp != "":
                 questions[question][1] = inp
             # check if we are asking for the band
-            if question == "band" and questions["freq"][1] != "":
+            if question == "band":
                 # check if the band is in the bandfreqs dictionary
                 try:
                     # populate the frequency with a common freq of this band
@@ -558,6 +529,7 @@ class QRZLogger():
                             values from config file." + attr('reset'))
 
         return questions
+
 
     def get_input_callsign(self):
         """query a call sign from the user"""
