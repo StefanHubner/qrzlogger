@@ -125,11 +125,11 @@ class QRZLogger():
             config['log'] = {
                 'log_file': '/tmp/qrzlogger.log'}
             config['qso_defaults'] = {
-                'band': '40m',
+                'band': '20',
                 'mode': 'SSB',
                 'rst_rcvd': '59',
                 'rst_sent': '59',
-                'tx_pwr': '5'}
+                'tx_pwr': '100'}
             config['colors'] = {
                 'use_colors': 'yes',
                 'inputcol': 'yellow',
@@ -140,19 +140,19 @@ class QRZLogger():
                 'tablecol': 'light_blue',
                 'logocol': 'yellow'}
             config['bandfreqs'] = {
-                '160m': '1.850',
-                '80m': '3.700',
-                '60m': '5.355',
-                '40m': '7.100',
-                '30m': '10.130',
-                '20m': '14.200',
-                '17m': '18.130',
-                '15m': '21.200',
-                '12m': '24.950',
-                '10m': '28.500',
-                '6m': '50.150',
-                '2m': '145.500',
-                '70cm': '432.300' }
+                '160': '1.850',
+                '80': '3.700',
+                '60': '5.355',
+                '40': '7.100',
+                '30': '10.130',
+                '20': '14.200',
+                '17': '18.130',
+                '15': '21.200',
+                '12': '24.950',
+                '10': '28.500',
+                '6': '50.150',
+                '2': '145.500',
+                '70': '432.300' }
 
             with open(file_name, 'w') as configfile:
                 config.write(configfile)
@@ -489,14 +489,14 @@ class QRZLogger():
         if qso is None:
             questions = {
                 "band": ["Band", self.config['qso_defaults']['band']],
-                "comment": ["Comment", ""],
-                "qso_date" : ["QSO Date", dt_now.strftime("%Y%m%d")],
-                "time_on": ["QSO Time", dt_now.strftime("%H%M")],
-                "freq": ["Frequency", ""],
-                "mode": ["Mode", self.config['qso_defaults']['mode']],
                 "rst_rcvd": ["RST Received", self.config['qso_defaults']['rst_rcvd']],
                 "rst_sent": ["RST Sent", self.config['qso_defaults']['rst_sent']],
-                "tx_pwr": ["Power (in W)", self.config['qso_defaults']['tx_pwr']]
+                "comment": ["Comment", ""],
+                "freq": ["Frequency", ""],
+                "mode": ["Mode", self.config['qso_defaults']['mode']],
+                "tx_pwr": ["Power (in W)", self.config['qso_defaults']['tx_pwr']],
+                "qso_date" : ["QSO Date", dt_now.strftime("%Y%m%d")],
+                "time_on": ["QSO Time", dt_now.strftime("%H%M")]
                 }
         # if this is not the first try, we pre-fill the
         # vaulues we got from the last try
