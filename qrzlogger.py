@@ -44,7 +44,7 @@ class QRZLogger():
     def __init__(self):
         """initialize things"""
 
-        self.version = "0.7.0"
+        self.version = "0.8.1"
 
         # Define the configuration object
         self.config = configparser.ConfigParser()
@@ -488,15 +488,15 @@ class QRZLogger():
         # then we use defaults
         if qso is None:
             questions = {
+                "band": ["Band", self.config['qso_defaults']['band']],
+                "comment": ["Comment", ""],
                 "qso_date" : ["QSO Date", dt_now.strftime("%Y%m%d")],
                 "time_on": ["QSO Time", dt_now.strftime("%H%M")],
-                "band": ["Band", self.config['qso_defaults']['band']],
                 "freq": ["Frequency", ""],
                 "mode": ["Mode", self.config['qso_defaults']['mode']],
                 "rst_rcvd": ["RST Received", self.config['qso_defaults']['rst_rcvd']],
                 "rst_sent": ["RST Sent", self.config['qso_defaults']['rst_sent']],
-                "tx_pwr": ["Power (in W)", self.config['qso_defaults']['tx_pwr']],
-                "comment": ["Comment", ""]
+                "tx_pwr": ["Power (in W)", self.config['qso_defaults']['tx_pwr']]
                 }
         # if this is not the first try, we pre-fill the
         # vaulues we got from the last try
@@ -513,6 +513,8 @@ class QRZLogger():
             # If not, we keep the data provided by the user
             if inp == "c":
                 return None
+            if inp == "d":
+                return questions
             if inp == "quit":
                 sys.exit()
             if inp != "":
@@ -666,7 +668,7 @@ def main():
                     % (attr('underlined'), qrz.hlcol, call, attr('reset')))
             qrz.print_table(qrz.get_qso_table(result))
 
-        print ('%s%sEnter new QSO details below%s%s (enter \'c\' to cancel)%s\n' \
+        print ('%s%sEnter new QSO details below%s%s (enter \'c\' to cancel, \'d\' to fast forward)%s\n' \
                 % (attr('underlined'), qrz.hlcol, attr('reset'), qrz.hlcol, attr('reset'),))
 
         done = False
