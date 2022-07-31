@@ -120,12 +120,11 @@ class QRZLogger():
                 'api_key': '1234-ABCD-1234-A1B2',
                 'qrz_user': 'MYCALL',
                 'qrz_pass': 'my_secret_password',
-                'xml_fields': '("call", "band", "mode", "qso_date",\
-                        "time_on", "rst_sent", "rst_rcvd", "comment")'}
+                'xml_fields': '("call", "band", "mode", "qso_date", "time_on", "rst_sent", "rst_rcvd", "comment")'}
             config['log'] = {
                 'log_file': '/tmp/qrzlogger.log'}
             config['qso_defaults'] = {
-                'band': '20',
+                'band': '20m',
                 'mode': 'SSB',
                 'rst_rcvd': '59',
                 'rst_sent': '59',
@@ -140,19 +139,19 @@ class QRZLogger():
                 'tablecol': 'light_blue',
                 'logocol': 'yellow'}
             config['bandfreqs'] = {
-                '160': '1.850',
-                '80': '3.700',
-                '60': '5.355',
-                '40': '7.100',
-                '30': '10.130',
-                '20': '14.200',
-                '17': '18.130',
-                '15': '21.200',
-                '12': '24.950',
-                '10': '28.500',
-                '6': '50.150',
-                '2': '145.500',
-                '70': '432.300' }
+                '160m': '1.850',
+                '80m': '3.700',
+                '60m': '5.355',
+                '40m': '7.100',
+                '30m': '10.130',
+                '20m': '14.200',
+                '17m': '18.130',
+                '15m': '21.200',
+                '12m': '24.950',
+                '10m': '28.500',
+                '6m': '50.150',
+                '2m': '145.500',
+                '70cm': '432.300' }
 
             with open(file_name, 'w') as configfile:
                 config.write(configfile)
@@ -433,7 +432,7 @@ class QRZLogger():
 
     @staticmethod
     def get_recent_qso_table(recent_qsos):
-        """Print a pretty ascii table containing 
+        """Print a pretty ascii table containing
         the n previous QSOs"""
 
         table = PrettyTable(['Time', 'Frequency', 'Call'])
@@ -448,34 +447,6 @@ class QRZLogger():
     #####################################################
     #          User Interaction Functions               #
     #####################################################
-
-    def get_band_from_freq(self, freq):
-        bandfreq = freq.split('.',1)[0]
-        if bandfreq == "1":
-            return "160m"
-        elif bandfreq == "3":
-            return "80m"
-        elif bandfreq == "5":
-            return "60m"
-        elif bandfreq == "7":
-            return "40m"
-        elif bandfreq == "10":
-            return "30m"
-        elif bandfreq == "14":
-            return "20m"
-        elif bandfreq == "18":
-            return "17m"
-        elif bandfreq == "21":
-            return "15m"
-        elif bandfreq == "24":
-            return "12m"
-        elif bandfreq == "28":
-            return "10m"
-        elif bandfreq == "29":
-            return "10m"
-        elif bandfreq == "50":
-            return "6m"
-
 
     def query_qso_data(self, qso):
         """Queries QSO specific data from the user via
@@ -564,13 +535,12 @@ class QRZLogger():
                     logid = self.send_qso(self.qso, call)
                     if logid and logid != "null":
                         break
-                    else:
-                        answer = input("\n" + self.inputcol + "QSO Upload failed. Retry? [" + \
-                                self.defvalcol +  "y/n" + self.inputcol + "]: " + attr('reset'))
-                        answer = answer.upper()
-                        if answer == "N":
-                            done = True
-                            break
+                    answer = input("\n" + self.inputcol + "QSO Upload failed. Retry? [" + \
+                            self.defvalcol +  "y/n" + self.inputcol + "]: " + attr('reset'))
+                    answer = answer.upper()
+                    if answer == "N":
+                        done = True
+                        break
                 if logid and logid.lower() != "null":
                     # pull the uploaded QSO from QRZ
                     result = self.get_qsos("LOGIDS:"+ logid)
@@ -582,14 +552,13 @@ class QRZLogger():
                             self.recent_qsos.pop(0)
                     done = True
                     break
-                else:
-                    break
-            elif answer == "C":
+                break
+            if answer == "C":
                 done = True
                 break
-            elif answer == "N":
+            if answer == "N":
                 break
-            elif answer == "QUIT":
+            if answer == "QUIT":
                 sys.exit()
         return done
 
