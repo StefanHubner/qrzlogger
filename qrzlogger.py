@@ -57,6 +57,9 @@ class QRZLogger():
         else:
             self.log_file = os.path.expanduser('~/.qrzlogger.log')
 
+        self.contest = False
+        if len(sys.argv) > 1 and str(sys.argv[1]) == "-c":
+            self.contest = True
 
         # QRZ.com URLs
         self.xml_url = "https://xmldata.QRZ.com/xml/current/"
@@ -458,17 +461,33 @@ class QRZLogger():
         # If this is the first try filling out the QSO fields
         # then we use defaults
         if qso is None:
-            questions = {
-                "band": ["Band", self.config['qso_defaults']['band']],
-                "rst_rcvd": ["RST Received", self.config['qso_defaults']['rst_rcvd']],
-                "rst_sent": ["RST Sent", self.config['qso_defaults']['rst_sent']],
-                "comment": ["Comment", ""],
-                "freq": ["Frequency", ""],
-                "mode": ["Mode", self.config['qso_defaults']['mode']],
-                "tx_pwr": ["Power (in W)", self.config['qso_defaults']['tx_pwr']],
-                "qso_date" : ["QSO Date", dt_now.strftime("%Y%m%d")],
-                "time_on": ["QSO Time", dt_now.strftime("%H%M")]
-                }
+            if not self.contest:
+                questions = {
+                    "band": ["Band", self.config['qso_defaults']['band']],
+                    "rst_rcvd": ["RST Received", self.config['qso_defaults']['rst_rcvd']],
+                    "rst_sent": ["RST Sent", self.config['qso_defaults']['rst_sent']],
+                    "comment": ["Comment", ""],
+                    "freq": ["Frequency", ""],
+                    "mode": ["Mode", self.config['qso_defaults']['mode']],
+                    "tx_pwr": ["Power (in W)", self.config['qso_defaults']['tx_pwr']],
+                    "qso_date" : ["QSO Date", dt_now.strftime("%Y%m%d")],
+                    "time_on": ["QSO Time", dt_now.strftime("%H%M")]
+                    }
+            else:
+                questions = {
+                    "band": ["Band", self.config['qso_defaults']['band']],
+                    "srx": ["Serial Received", "001"],
+                    "srx_string": ["Info Received", ""],
+                    "stx": ["Serial Sent", "001"],
+                    "stx_string": ["Info Sent", ""],
+                    "freq": ["Frequency", ""],
+                    "mode": ["Mode", self.config['qso_defaults']['mode']],
+                    "rst_rcvd": ["RST Received", self.config['qso_defaults']['rst_rcvd']],
+                    "rst_sent": ["RST Sent", self.config['qso_defaults']['rst_sent']],
+                    "comment": ["Comment", ""],
+                    "qso_date" : ["QSO Date", dt_now.strftime("%Y%m%d")],
+                    "time_on": ["QSO Time", dt_now.strftime("%H%M")]
+                    }
         # if this is not the first try, we pre-fill the
         # vaulues we got from the last try
         else:
@@ -486,7 +505,7 @@ class QRZLogger():
                 return None
             if inp == "d":
                 return questions
-            if inp == "quit":
+            if inp == "quit" or inp == "exit":
                 sys.exit()
             if inp != "":
                 questions[question][1] = inp
@@ -500,7 +519,6 @@ class QRZLogger():
                 except: # pylint: disable=bare-except
                     print(self.errorcol + "\nUnable to read default frequency \
                             values from config file." + attr('reset'))
-
         return questions
 
 
@@ -509,7 +527,7 @@ class QRZLogger():
         call = ""
         while True:
             call = input("\n\n%sEnter Callsign:%s " % (self.inputcol, attr('reset')))
-            if call == "quit":
+            if call == "quit" or call == "exit":
                 sys.exit()
             # check if it has the format of a valid call sign
             # (at least 3 characters, only alphanumeric and slashes)
@@ -558,7 +576,7 @@ class QRZLogger():
                 break
             if answer == "N":
                 break
-            if answer == "QUIT":
+            if answer == "QUIT" or answer == "EXIT":
                 sys.exit()
         return done
 
@@ -588,6 +606,9 @@ def main():
 
     qrz = QRZLogger()
     qrz.print_banner()
+
+    if qrz.contest:
+        print("\nContest mode enabled.")
 
     keeponlogging = True
     session_key = None

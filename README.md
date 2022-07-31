@@ -42,7 +42,7 @@ To download or update qrzlogger, clone the repo:
 
 # Usage
 
- * execute the application with "python3 qrzlogger.py"
+ * execute the application with "python3 qrzlogger.py" for normal mode or with "python3 qrzlogger.py -c" for contest mode
  * qrzlogger creates a default config file and states its location (e.g. _~/.qrzlogger.ini_)
  * adapt _~/.qrzlogger.ini_ to your needs. Important setting are:
     * station_call: This is your station call (must match with the QRZ.com logbook)
