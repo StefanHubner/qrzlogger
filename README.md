@@ -4,11 +4,13 @@ This script is a QRZ.com command line QSO logger.
 It does the following:
   1) asks the user for a call sign
   2) displays available call sign info pulled from QRZ.com
-  3) displays all previous QSOs with this call (pulled from QRZ.com logbook)
-  4) asks the user to enter QSO specific data (date, time, report, band etc.)
-  5) uploads the QSO to QRZ.com's logbook
-  5) fetches the just uploaded QSO from QRZ.com for review
-  7) starts again from 1)
+  3) displays additional info on country, continent and LotW upload date of the call
+  4) checks if the country has not been confirmed via LotW yet and alerts the user
+  5) displays all previous QSOs with this call (pulled from QRZ.com logbook)
+  6) asks the user to enter QSO specific data (date, time, report, band etc.)
+  7) uploads the QSO to QRZ.com's logbook
+  8) fetches the just uploaded QSO from QRZ.com for review
+  9) starts again from 1)
 
 # Screnshot
 
