@@ -43,13 +43,21 @@ To download or update qrzlogger, clone the repo:
 # Usage
 
  * execute the application with "python3 qrzlogger.py" for normal mode or with "python3 qrzlogger.py -c" for contest mode
- * qrzlogger creates a default config file and states its location (e.g. _~/.qrzlogger.ini_)
- * adapt _~/.qrzlogger.ini_ to your needs. Important setting are:
+ * qrzlogger creates a default config file and states its location (e.g. _~/.config/qrzlogger/qrzlogger.ini_)
+ * adapt _~/.config/qrzlogger/qrzlogger.ini_ to your needs. Important setting are:
     * station_call: This is your station call (must match with the QRZ.com logbook)
     * api_key: Your QRZ.com API key. You find it under "settings" in the QRZ.com logbook'
     * qrz_user: Your QRZ.com user name, typically your call sign'
     * qrz_pass: Your QRZ.com password (not the API key)'
+    * lotw/user: Enter here your lotw user name (your call sign). Leave at "N0CALL" to disable this feature.
+    * lotw/password: Enter here your lotw password
+    * lotw/mode: Enter here the mode you would like to filter the QSL download from LotW
  * execute the application again with "python3 qrzlogger.py"
+ * the software now tries to download the following files and stores them into the configuration directory:
+    * https://www.country-files.com/bigcty/download/bigcty.zip (will be extracted)
+    * https://lotw.arrl.org/lotw-user-activity.csv
+    * https://lotw.arrl.org/lotwuser/lotwreport.adi?login={}&password={}&qso_query=1&qso_qsl=yes&qso_mode={}&qso_qsldetail=yes&qso_qslsince=1970-01-01
+
 
 # License
 
