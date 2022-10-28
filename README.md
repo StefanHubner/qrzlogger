@@ -12,7 +12,7 @@ It does the following:
   8) fetches the just uploaded QSO from QRZ.com for review
   9) starts again from 1)
 
-# Screnshot
+# Screenshot
 
 ![screenshot](/screenshot_0.8.1.jpg?raw=true "screenshot")
 
