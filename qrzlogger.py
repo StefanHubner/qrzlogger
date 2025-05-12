@@ -1,96 +1,131 @@
 #!/usr/bin/env python3
 
-# pylint: disable=W1401
-
 """
-+---------------------------------------------------------------------+
-|                            _                                        |
-|                __ _ _ _ __| |___  __ _ __ _ ___ _ _                 |
-|               / _` | '_|_ / / _ \/ _` / _` / -_) '_|                |
-|               \__, |_| /__|_\___/\__, \__, \___|_|                  |
-|                  |_|             |___/|___/                         |
-|                                                                     |
-|                                                                     |
-| A python application to log QSOs directly to QRZ.com from the CLI   |
-|                                                                     |
-| Author:           Michael Clemens, DK1MI (qrzlogger@qrz.is)         |
-|                                                                     |
-| Documentation:    Please see the README.md file                     |
-| License:          Please see the LICENSE file                       |
-| Repository:       https://github.com/exitnode/qrzlogger             |
-|                                                                     |
-+---------------------------------------------------------------------+
+QRZLogger - A Python application to log QSOs directly to QRZ.com from the CLI
+
+Author: Michael Clemens, DK1MI (qrzlogger@qrz.is)
+Documentation: Please see the README.md file
+License: Please see the LICENSE file
+Repository: https://github.com/exitnode/qrzlogger
 """
 
-import urllib
-import re
-import datetime
-import os
-from os.path import exists
-import sys
+import atexit
 import csv
 import configparser
-import zipfile
+import datetime
+import os
+import re
 import signal
-import atexit
+import sys
+import urllib.parse
+import zipfile
+import readline
 from datetime import timezone
-from colored import attr, fg
-from requests.structures import CaseInsensitiveDict
-from prettytable import PrettyTable
-import xmltodict
-import requests
 from pathlib import Path
+from typing import Dict, List, Optional, Tuple, Union, Any, Generator
+
+import requests
+import xmltodict
+from colored import attr, fg
+from prettytable import PrettyTable
 
 
-class QRZLogger():
-    """QRZLogger class"""
-
-    def __init__(self):
-        """initialize things"""
-
-        self.version = "0.9.0"
+# Global variables for interrupt handling
+in_qso_entry = False
 
 
+class Config:
+    """Configuration manager for QRZLogger"""
 
-        self.config = configparser.ConfigParser()
+    def __init__(self, config_path: Optional[str] = None):
+        """Initialize configuration"""
+        # Disable interpolation to handle % characters in values
+        self.config = configparser.ConfigParser(interpolation=None)
         self.home_dir = str(Path.home())
-        self.config_dir = self.home_dir + "/.config/qrzlogger/"
-        # Check if config directory exists and else create it
-        Path(self.config_dir).mkdir(parents=True, exist_ok=True)
-        self.config_file = os.path.expanduser(self.config_dir + 'qrzlogger.ini')
-        self.read_config(self.config, self.config_file)
+        self.config_dir = Path(self.home_dir) / ".config" / "qrzlogger"
+        self.config_dir.mkdir(parents=True, exist_ok=True)
 
-        self.check_files()
+        self.config_file = config_path or (self.config_dir / 'qrzlogger.ini')
+        self._load_config()
 
-        if self.config['lotw']['user'] != "N0CALL" and self.check_lotw_confirmed:
-            self.confirmed_entities = self.get_confirmed_entities()
-
-        if self.check_cty:
-            with open(self.config_dir + self.config['files']['cty'], encoding='us-ascii') as csvfile:
-                self.cty = list(csv.reader(csvfile, delimiter=','))
-
-        if self.check_lotw_activity:
-            with open(self.config_dir + self.config['files']['lotw_activity'], encoding='us-ascii') as csvfile:
-                self.lotw_activity = list(csv.reader(csvfile, delimiter=','))
-
-
-
-        if self.config and self.config['log']['log_file']:
-            self.log_file = self.config['log']['log_file']
+    def _load_config(self) -> None:
+        """Load configuration or create default if none exists"""
+        if self.config_file.exists():
+            self.config.read(self.config_file)
         else:
-            self.log_file = os.path.expanduser('~/.qrzlogger.log')
+            self._create_default_config()
+            print(f"\nNo configuration file found. A new configuration file has been created.")
+            print(f"\nPlease edit the file {self.config_file} and restart the application.\n")
+            sys.exit(0)
 
-        self.contest = False
-        if len(sys.argv) > 1 and str(sys.argv[1]) == "-c":
-            self.contest = True
+    def _create_default_config(self) -> None:
+        """Create default configuration"""
+        self.config['qrz.com'] = {
+            'station_call': 'MYCALL',
+            'api_key': '1234-ABCD-1234-A1B2',
+            'qrz_user': 'MYCALL',
+            'qrz_pass': 'my_secret_password',
+            'xml_fields': '("call", "band", "mode", "qso_date", "time_on", "rst_sent", "rst_rcvd", "tx_pwr")'
+        }
+        self.config['files'] = {
+            'cty': 'cty.csv',
+            'cty_url': 'https://www.country-files.com/bigcty/download/bigcty.zip',
+        }
+        self.config['log'] = {
+            'log_file': '/tmp/qrzlogger.log'
+        }
+        self.config['qso_defaults'] = {
+            'band': '20m',
+            'mode': 'SSB',
+            'rst_rcvd': '59',
+            'rst_sent': '59',
+            'tx_pwr': '100'
+        }
+        self.config['colors'] = {
+            'use_colors': 'yes',
+            'inputcol': 'yellow',
+            'hlcol': 'yellow',
+            'defvalcol': 'light_blue',
+            'errorcol': 'red',
+            'successcol': 'green',
+            'tablecol': 'light_blue',
+            'logocol': 'yellow'
+        }
+        self.config['bandfreqs'] = {
+            '160m': '1.850',
+            '80m': '3.700',
+            '60m': '5.355',
+            '40m': '7.100',
+            '30m': '10.130',
+            '20m': '14.200',
+            '17m': '18.130',
+            '15m': '21.200',
+            '12m': '24.950',
+            '10m': '28.500',
+            '6m': '50.150',
+            '2m': '145.500',
+            '70cm': '432.300'
+        }
 
-        # QRZ.com URLs
-        self.xml_url = "https://xmldata.QRZ.com/xml/current/"
-        self.api_url = "https://logbook.qrz.com/api"
+        with open(self.config_file, 'w') as configfile:
+            self.config.write(configfile)
 
-        # headers for all POST requests
-        self.headers = CaseInsensitiveDict()
-        self.headers["Content-Type"] = "application/x-www-form-urlencoded"
+    def get(self, section: str, key: str, fallback: Any = None) -> Any:
+        """Get configuration value"""
+        return self.config.get(section, key, fallback=fallback)
+
+    def get_section(self, section: str) -> Dict[str, str]:
+        """Get entire configuration section"""
+        return dict(self.config[section]) if section in self.config else {}
+
+
+class ColorManager:
+    """Manages color styling for the application"""
+
+    def __init__(self, config: Config):
+        """Initialize color settings"""
+        self.config = config
+        self.use_colors = config.get('colors', 'use_colors') == 'yes'
 
         # Default colors
         self.inputcol = attr('reset')
@@ -101,339 +136,278 @@ class QRZLogger():
         self.tablecol = attr('reset')
         self.logocol = attr('reset')
 
-        self.qso = None
-        self.recent_qso_limit = 5
-        self.recent_qsos = []
+        # Set colors from config if enabled
+        if self.use_colors:
+            self._configure_colors()
 
-        # read colors from config and overwrite default vaulues
-        self.config_colors()
+    def _configure_colors(self) -> None:
+        """Set colors from configuration"""
+        self.inputcol = fg(self.config.get('colors', 'inputcol'))
+        self.hlcol = fg(self.config.get('colors', 'hlcol'))
+        self.defvalcol = fg(self.config.get('colors', 'defvalcol'))
+        self.errorcol = fg(self.config.get('colors', 'errorcol'))
+        self.successcol = fg(self.config.get('colors', 'successcol'))
+        self.tablecol = fg(self.config.get('colors', 'tablecol'))
+        self.logocol = fg(self.config.get('colors', 'logocol'))
 
-    def print_banner(self):
-        """print an awesome banner"""
-        ver = self.version
-        # print the banner
-        print(self.logocol)
-        print("              _                        ")
-        print("  __ _ _ _ __| |___  __ _ __ _ ___ _ _ ")
-        print(" / _` | '_|_ / / _ \/ _` / _` / -_) '_|")
-        print(" \__, |_| /__|_\___/\__, \__, \___|_|  ")
-        print("    |_|  -=DK1MI=-  |___/|___/ v"+ver+"  ")
-        print(attr('reset'))
-
-
-    def config_colors(self):
-        """Read color settings from config file"""
-        if self.config and self.config['colors']['use_colors'] == "yes":
-            self.inputcol = fg(self.config['colors']['inputcol'])
-            self.hlcol = fg(self.config['colors']['hlcol'])
-            self.defvalcol = fg(self.config['colors']['defvalcol'])
-            self.errorcol = fg(self.config['colors']['errorcol'])
-            self.successcol = fg(self.config['colors']['successcol'])
-            self.tablecol = fg(self.config['colors']['tablecol'])
-            self.logocol = fg(self.config['colors']['logocol'])
-
-
-    @staticmethod
-    def read_config(config, file_name):
-        """reads the configuration from the config file or
-        creates a default config file if none could be found"""
-        if os.path.isfile(file_name):
-            config.read(file_name)
-        else:
-            config = configparser.ConfigParser()
-            config['qrz.com'] = {
-                'station_call': 'MYCALL',
-                'api_key': '1234-ABCD-1234-A1B2',
-                'qrz_user': 'MYCALL',
-                'qrz_pass': 'my_secret_password',
-                'xml_fields': '("call", "band", "mode", "qso_date", "time_on", "rst_sent", "rst_rcvd", "comment")'}
-            config['files'] = {
-                'cty': 'cty.csv',
-                'cty_url': 'https://www.country-files.com/bigcty/download/bigcty.zip',
-                'lotw_confirmed': 'lotw.adi',
-                'lotw_activity': 'lotw-user-activity.csv',
-                'lotw_activity_url': 'https://lotw.arrl.org/lotw-user-activity.csv'}
-            config['lotw'] = {
-                'user': 'N0CALL',
-                'password': 'CHANGEME',
-                'mode': 'ssb'}
-            config['log'] = {
-                'log_file': '/tmp/qrzlogger.log'}
-            config['qso_defaults'] = {
-                'band': '20m',
-                'mode': 'SSB',
-                'rst_rcvd': '59',
-                'rst_sent': '59',
-                'tx_pwr': '100'}
-            config['colors'] = {
-                'use_colors': 'yes',
-                'inputcol': 'yellow',
-                'hlcol': 'yellow',
-                'defvalcol': 'light_blue',
-                'errorcol': 'red',
-                'successcol': 'green',
-                'tablecol': 'light_blue',
-                'logocol': 'yellow'}
-            config['bandfreqs'] = {
-                '160m': '1.850',
-                '80m': '3.700',
-                '60m': '5.355',
-                '40m': '7.100',
-                '30m': '10.130',
-                '20m': '14.200',
-                '17m': '18.130',
-                '15m': '21.200',
-                '12m': '24.950',
-                '10m': '28.500',
-                '6m': '50.150',
-                '2m': '145.500',
-                '70cm': '432.300' }
-
-            with open(file_name, 'w') as configfile:
-                config.write(configfile)
-            print("\nNo configuration file found. A new configuration file has been created.")
-            print("\nPlease edit the file " + file_name + " and restart the application.\n" )
-            sys.exit()
-        return config
-
-
-    @staticmethod
-    def remove_indicators(call):
-        """returns the actual call sign without any indicators
-        (e.g, "/p" or "F/")"""
-
-        # set the return value to the value of "call"
-        cleaned_call = call
-        # check if the callsign has a suffix (.e.g. /p)
-        if call.endswith(("/P","/MM","/M","/QRP")):
-            cleaned_call = call.rsplit('/', 1)[0]
-        # check if the callsign has a prefix (e.g. DL/)
-        if "/" in cleaned_call:
-            cleaned_call = re.sub(r'^\w+/', "", cleaned_call)
-        return cleaned_call
-
-
-    def print_table(self, tab):
-        """Print the table object to stdout"""
+    def print_table(self, table: PrettyTable) -> None:
+        """Print a table with table styling"""
         print(self.tablecol)
-        print(tab)
+        print(table)
         print(attr('reset'))
 
-    @staticmethod
-    def download_file(url, local_filename):
-        """downloads a file via HTTP and saves it to a defined file"""
-        with requests.get(url, stream=True) as request:
-            request.raise_for_status()
-            with open(local_filename, 'wb') as file:
-                for chunk in request.iter_content(chunk_size=8192):
-                    file.write(chunk)
-        return local_filename
+    def format_input_prompt(self, prompt: str, default: str = "") -> str:
+        """Format an input prompt with appropriate colors"""
+        if default:
+            return f"{self.inputcol}{prompt} [{self.defvalcol}{default}{self.inputcol}]: {attr('reset')}"
+        return f"{self.inputcol}{prompt}: {attr('reset')}"
+
+    def error(self, message: str) -> None:
+        """Print an error message"""
+        print(f"{self.errorcol}{message}{attr('reset')}")
+
+    def success(self, message: str) -> None:
+        """Print a success message"""
+        print(f"{self.successcol}{message}{attr('reset')}")
+
+    def highlight(self, message: str) -> None:
+        """Print a highlighted message"""
+        print(f"{self.hlcol}{message}{attr('reset')}")
 
 
-    def check_files(self):
-        """Checks if all necessary files are in the file system.
-        Downloads all files and unzips them (if necessary)"""
+class FileManager:
+    """Handles file operations for QRZLogger"""
 
-        # check for lotw qsl information file
-        if self.config['lotw']['user'] != "N0CALL":
-            self.check_lotw_confirmed = exists(self.config_dir + self.config['files']['lotw_confirmed'])
-            if not self.check_lotw_confirmed:
-                print("The file " + self.config_dir + self.config['files']['lotw_confirmed'] + " is missing.")
-                user = self.config['lotw']['user']
-                password = self.config['lotw']['password']
-                mode = self.config['lotw']['mode']
-                url = "https://lotw.arrl.org/lotwuser/lotwreport.adi?login={}&password={}"\
-                    "&qso_query=1&qso_qsl=yes&qso_mode={}&qso_qsldetail=yes&"\
-                    "qso_qslsince=1970-01-01".format(user, password, mode)
-                print("Trying to download " + url)
-                self.download_file(url, self.config_dir + self.config['files']['lotw_confirmed'])
-                self.check_lotw_confirmed = exists(self.config_dir + self.config['files']['lotw_confirmed'])
-                if self.check_lotw_confirmed:
-                    print("File successfully downloaded")
-                else:
-                    print("something went wrong while downloading " + url)
-        else:
-            self.check_lotw_confirmed = False
+    def __init__(self, config: Config, colors: ColorManager):
+        """Initialize the file manager"""
+        self.config = config
+        self.colors = colors
+        self.config_dir = config.config_dir
 
-        # check for cty.csv file
-        self.check_cty = exists(self.config_dir + self.config['files']['cty'])
+        # Initialize file status
+        self.check_cty = False
+
+        # Data containers
+        self.cty = []
+
+        # Check and download necessary files
+        self._check_files()
+
+    def _check_files(self) -> None:
+        """Check if necessary files exist and download them if needed"""
+        self._check_cty_file()
+
+        # Load data if files exist
+        if self.check_cty:
+            with open(self.config_dir / self.config.get('files', 'cty'), encoding='us-ascii') as csvfile:
+                self.cty = list(csv.reader(csvfile, delimiter=','))
+
+    def _check_cty_file(self) -> None:
+        """Check if CTY file exists and download if needed"""
+        cty_file = self.config_dir / self.config.get('files', 'cty')
+        self.check_cty = cty_file.exists()
+
         if not self.check_cty:
-            url = self.config['files']['cty_url']
-            print("The file " + self.config_dir + self.config['files']['cty'] + " is missing.")
-            print("Trying to download " + url)
-            # TODO: pfad?
-            zip_name = self.download_file(url, self.config_dir + "bigcty.zip" )
-            with zipfile.ZipFile(zip_name, 'r') as zip_ref:
-                zip_ref.extract("cty.csv", path=self.config_dir)
-            os.remove(zip_name)
-            self.check_cty = exists(self.config_dir + self.config['files']['cty'])
-            if self.check_cty:
-                print("File successfully downloaded and extracted.")
-            else:
-                print("something went wrong while downloading " + url)
+            url = self.config.get('files', 'cty_url')
+            self.colors.highlight(f"The file {cty_file} is missing.")
+            self.colors.highlight(f"Trying to download {url}")
 
-        # check for lotw user activity file
-        self.check_lotw_activity = exists(self.config_dir + self.config['files']['lotw_activity'])
-        if not self.check_lotw_activity:
-            url = self.config['files']['lotw_activity_url']
-            print("The file " + self.config_dir + self.config['files']['lotw_activity'] + " is missing.")
-            print("Trying to download " + url)
-            self.download_file(url, self.config_dir + self.config['files']['lotw_activity'])
-            self.check_lotw_activity = exists(self.config_dir + self.config['files']['lotw_activity'])
-            if self.check_lotw_activity:
-                print("File successfully downloaded")
-            else:
-                print("something went wrong while downloading " + url)
+            try:
+                zip_path = self.config_dir / "bigcty.zip"
+                self._download_file(url, zip_path)
 
+                with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                    zip_ref.extract("cty.csv", path=self.config_dir)
 
-    def get_confirmed_entities(self):
-        """Reads the file downlaoded from LotW with all confirmed QSOs,
-        extracts all confirmed DXCCs and puts them into a list"""
-        ret = []
-        with open(self.config_dir + self.config['files']['lotw_confirmed'], encoding='us-ascii') as file:
-            for row in file:
-                if re.search("<DXCC:", row):
-                    dxcc = row.partition(">")[2].lower().rstrip()
-                    if dxcc not in ret:
-                        ret.append(dxcc)
-        return ret
+                zip_path.unlink()  # Remove the zip file
+                self.check_cty = cty_file.exists()
 
+                if self.check_cty:
+                    self.colors.success("File successfully downloaded and extracted.")
+                else:
+                    self.colors.error(f"Something went wrong while downloading {url}")
+            except Exception as e:
+                self.colors.error(f"Error downloading CTY file: {e}")
 
-    def check_lotw(self, call):
-        """Reads the LotW user activity file and returns the date
-        of the last upload date if a specific call sign"""
-        ret = ""
-        for row in self.lotw_activity:
-            if call == row[0]:
-                ret = row[1]
-                return ret
-        return ret
+    @staticmethod
+    def _download_file(url: str, destination: Path) -> Path:
+        """Download a file from URL to local destination"""
+        with requests.get(url, stream=True) as req:
+            req.raise_for_status()
+            with open(destination, 'wb') as f:
+                for chunk in req.iter_content(chunk_size=8192):
+                    f.write(chunk)
+        return destination
 
+    def get_cty_row(self, call: str) -> List[str]:
+        """Find country data for a call sign in the CTY database"""
+        if not self.check_cty:
+            return ["-", "-", "-", "-", "-", "-", "-"]
 
-    def get_cty_row(self, call):
-        """Parses all CTY records, tries to find the DXCC entity of a
-        specific call sign and returns the line as a list of strings"""
-        done = False
-        while not done:
+        original_call = call
+
+        while call:
             for row in self.cty:
                 entities = row[9].replace(";", "").replace("=", "").split(" ")
-                # TODO: Check if it is a speciall call (=) and mark it in the list
                 for prefix in entities:
                     if call == prefix:
                         return row
+
+            # Progressively remove characters from the end of the call
             call = call[:-1]
-            if call == "":
-                return ["-", "-", "-", "-", "-", "-", "-"]
-        return None
+
+        # If no match found
+        return ["-", "-", "-", "-", "-", "-", "-"]
 
 
-    #####################################################
-    #             QRZ.com API Functions                 #
-    #####################################################
+class CallSignUtils:
+    """Utilities for processing call signs"""
 
-    def get_session(self):
-        """Generate a session for QRZ.com's xml service with
-        the help of the QRZ.com username and password"""
-        session_key = None
+    @staticmethod
+    def remove_indicators(call: str) -> str:
+        """Strip indicators like /P, /MM, etc. from a call sign"""
+        # Set the return value to the original call
+        cleaned_call = call
+
+        # Check for suffix (e.g., /P)
+        if call.endswith(("/P", "/MM", "/M", "/QRP")):
+            cleaned_call = call.rsplit('/', 1)[0]
+
+        # Check for prefix (e.g., DL/)
+        if "/" in cleaned_call:
+            cleaned_call = re.sub(r'^\w+/', "", cleaned_call)
+
+        return cleaned_call
+
+
+class QRZAPI:
+    """Handles all QRZ.com API interactions"""
+
+    def __init__(self, config: Config, colors: ColorManager):
+        """Initialize QRZ API handler"""
+        self.config = config
+        self.colors = colors
+
+        # QRZ.com URLs
+        self.xml_url = "https://xmldata.QRZ.com/xml/current/"
+        self.api_url = "https://logbook.qrz.com/api"
+
+        # Headers for all POST requests
+        self.headers = {'Content-Type': 'application/x-www-form-urlencoded'}
+
+        # Parse XML fields from config
+        self.xml_fields = eval(config.get('qrz.com', 'xml_fields'))
+
+    def get_session(self) -> Optional[str]:
+        """Get a QRZ.com XML service session key"""
         data = {
-            'username' : self.config['qrz.com']['qrz_user'],
-            'password' : self.config['qrz.com']['qrz_pass']
-            }
+            'username': self.config.get('qrz.com', 'qrz_user'),
+            'password': self.config.get('qrz.com', 'qrz_pass')
+        }
 
         try:
-            session = requests.Session()
-            session.verify = True
-            result = session.post(self.xml_url, data=data)
-            if result.status_code == 200:
-                raw_session = xmltodict.parse(result.content)
-                if raw_session.get('QRZDatabase').get('Session').get('Error'):
-                    print(self.errorcol + "\nError while logging into the QRZ.com XML Service:\n")
-                    print(raw_session.get('QRZDatabase').get('Session').get('Error'))
-                    print(attr('reset'))
-                session_key = raw_session.get('QRZDatabase').get('Session').get('Key')
-                if session_key:
-                    return session_key
-        except requests.exceptions.ConnectionError as e_conn:
-            print(self.errorcol + "\nUnable to connect to xmldata.qrz.com:")
-            print(e_conn)
-            print("\nPlease check if\n * username and password are correct \
-                    (see config.ini)\n * you are connected to the internet")
-            print(attr('reset'))
-        except: # pylint: disable=bare-except
-            print(self.errorcol + "\nsomething unexpected has happened:\n")
-            print(attr('reset'))
-        return session_key
+            with requests.Session() as session:
+                session.verify = True
+                result = session.post(self.xml_url, data=data)
 
+                if result.status_code == 200:
+                    raw_session = xmltodict.parse(result.content)
 
-    def send_request(self, post_data):
-        """Sends a POST request to QRZ.com, checks for errors
-        and returns the response"""
+                    if raw_session.get('QRZDatabase', {}).get('Session', {}).get('Error'):
+                        self.colors.error("\nError while logging into the QRZ.com XML Service:")
+                        self.colors.error(raw_session.get('QRZDatabase', {}).get('Session', {}).get('Error'))
+                        return None
+
+                    return raw_session.get('QRZDatabase', {}).get('Session', {}).get('Key')
+
+                self.colors.error(f"\nError connecting to QRZ.com: HTTP status {result.status_code}")
+                return None
+
+        except requests.exceptions.ConnectionError as e:
+            self.colors.error("\nUnable to connect to xmldata.qrz.com:")
+            self.colors.error(str(e))
+            self.colors.error("\nPlease check if:\n * username and password are correct (see config.ini)\n * you are connected to the internet")
+            return None
+        except Exception as e:
+            self.colors.error("\nUnexpected error occurred while connecting to QRZ.com:")
+            self.colors.error(str(e))
+            return None
+
+    def get_call_data(self, call: str, session_key: str) -> Optional[Dict[str, str]]:
+        """Query QRZ.com XML API for call sign information"""
+        if not session_key:
+            return None
+
+        data = {
+            's': session_key,
+            'callsign': call
+        }
+
         try:
-            resp = requests.post(self.api_url, headers=self.headers, data=post_data)
+            with requests.Session() as session:
+                session.verify = True
+                result = session.post(self.xml_url, data=data)
+
+                if result.status_code == 200:
+                    raw = xmltodict.parse(result.content).get('QRZDatabase', {})
+                    calldata = raw.get('Callsign')
+                    return calldata
+
+                self.colors.error(f"\nError querying call data: HTTP status {result.status_code}")
+                return None
+
+        except requests.exceptions.ConnectionError as e:
+            self.colors.error("\nUnable to connect to xmldata.qrz.com:")
+            self.colors.error(str(e))
+            self.colors.error("\nPlease check if you are connected to the internet")
+            return None
+        except Exception as e:
+            self.colors.error("\nUnexpected error occurred while querying call data:")
+            self.colors.error(str(e))
+            return None
+
+    def send_request(self, post_data: Dict[str, str]) -> Optional[str]:
+        """Send a POST request to QRZ.com API"""
+        try:
+            encoded_data = urllib.parse.urlencode(post_data)
+            resp = requests.post(self.api_url, headers=self.headers, data=encoded_data)
+
             if resp.status_code == 200:
-                str_resp = resp.content.decode("utf-8")
+                str_resp = resp.content.decode("latin-1")
                 response = urllib.parse.unquote(str_resp)
                 resp_list = response.splitlines()
-                if resp_list[0]:
-                    if "invalid api key" in resp_list[0]:
-                        print(self.errorcol + "\nThe API key configured \
-                                in config.ini is not correct.\n" + attr('reset'))
-                    else:
-                        return response
+
+                if resp_list and resp_list[0]:
+                    if "invalid api key" in resp_list[0].lower():
+                        self.colors.error("\nThe API key configured in config.ini is not correct.")
+                        return None
+                    return response
             elif resp.status_code == 404:
-                print(self.errorcol + "\nThe API URL could not be found. \
-                        Please check the URL in config.ini\n" + attr('reset'))
-        except requests.exceptions.ConnectionError as e_conn:
-            print(self.errorcol + "\nUnable to connect to xmldata.qrz.com:")
-            print(e_conn)
-            print("\nPlease check if you are connected to the internet")
-            print(attr('reset'))
-        except: # pylint: disable=bare-except
-            print(self.errorcol + "\nsomething unexpected has happened:\n")
-            print(e_conn)
-            print(attr('reset'))
-        return None
+                self.colors.error("\nThe API URL could not be found. Please check the URL in config.ini")
+                return None
+            else:
+                self.colors.error(f"\nAPI request failed with status code: {resp.status_code}")
+                return None
 
+        except requests.exceptions.ConnectionError as e:
+            self.colors.error("\nUnable to connect to QRZ.com API:")
+            self.colors.error(str(e))
+            self.colors.error("\nPlease check if you are connected to the internet")
+            return None
+        except Exception as e:
+            self.colors.error("\nUnexpected error occurred during API request:")
+            self.colors.error(str(e))
+            return None
 
-    def get_call_data(self, call, session_key):
-        """Query QRZ.com's xml api to gather information
-        about a specific call sign"""
-
-        data = {
-            's' : session_key,
-            'callsign' : call
-            }
-
-        try:
-            session = requests.Session()
-            session.verify = True
-            result = session.post(self.xml_url, data=data)
-            raw = xmltodict.parse(result.content).get('QRZDatabase')
-            calldata = raw.get('Callsign')
-            if calldata:
-                return calldata
-        except requests.exceptions.ConnectionError as e_conn:
-            print(self.errorcol + "\nUnable to connect to xmldata.qrz.com:")
-            print(e_conn)
-            print("\nPlease check if you are connected to the internet")
-            print(attr('reset'))
-        except: # pylint: disable=bare-except
-            print(self.errorcol + "\nsomething unexpected has happened:\n")
-            print(attr('reset'))
-        return None
-
-
-    def get_qsos(self, option):
-        """Query QRZ.com's logbook for all previous QSOs
-        with a specific call sign or for a specific logid"""
-
+    def get_qsos(self, option: str) -> List[Dict[str, str]]:
+        """Query QRZ.com logbook for previous QSOs"""
         result = [{}]
+
         post_data = {
-            'KEY' : self.config['qrz.com']['api_key'],
-            'ACTION' : 'FETCH',
-            'OPTION' : "TYPE:ADIF," + option
-            }
-        post_data = urllib.parse.urlencode(post_data)
+            'KEY': self.config.get('qrz.com', 'api_key'),
+            'ACTION': 'FETCH',
+            'OPTION': f"TYPE:ADIF,{option}"
+        }
 
         response = self.send_request(post_data)
 
@@ -443,446 +417,392 @@ class QRZLogger():
                 if not resp:
                     result.append({})
                 else:
-                    if any(s+":" in resp for s in self.config['qrz.com']['xml_fields']):
-                        resp = re.sub('&lt;','',resp, flags=re.DOTALL)
-                        resp = re.sub(':.*&gt;',":",resp, flags=re.DOTALL)
-                        value = re.sub('^.*:',"",resp, flags=re.DOTALL)
-                        key = re.sub(':.*$',"",resp, flags=re.DOTALL)
+                    # Check if this line contains a field we're interested in
+                    matches = [s for s in self.xml_fields if f"{s}:" in resp]
+                    if matches:
+                        # Parse the field
+                        resp = re.sub('&lt;', '', resp, flags=re.DOTALL)
+                        resp = re.sub(':.*&gt;', ":", resp, flags=re.DOTALL)
+                        value = re.sub('^.*:', "", resp, flags=re.DOTALL)
+                        key = re.sub(':.*$', "", resp, flags=re.DOTALL)
                         result[-1][key] = value
+
         return result
 
-
-    def send_qso(self, qso, call):
-        """Sends the previously collected QSO information as a new
-        QRZ.com logbook entry via the API"""
-
-        logid = "null"
+    def send_qso(self, qso: Dict[str, List[str]], call: str, log_file: Path) -> Optional[str]:
+        """Send QSO data to QRZ.com logbook"""
+        logid = None
         log_status = "FAILED:  "
 
-        # construct ADIF QSO entry
-        adif = '<station_callsign:' + str(len(self.config['qrz.com']['station_call'])) \
-                + '>' + self.config['qrz.com']['station_call']
-        adif += '<call:' + str(len(call)) + '>' + call
-        for field in qso:
-            adif += '<' + field + ':' + str(len(qso[field][1])) + '>' + qso[field][1]
+        # Construct ADIF QSO entry
+        station_call = self.config.get('qrz.com', 'station_call')
+        adif = f'<station_callsign:{len(station_call)}>{station_call}'
+        adif += f'<call:{len(call)}>{call}'
+
+        for field, (field_name, field_value) in qso.items():
+            adif += f'<{field}:{len(field_value)}>{field_value}'
+
         adif += '<eor>'
 
-        # construct POST data
-        post_data = { 'KEY' : self.config['qrz.com']['api_key'], \
-                'ACTION' : 'INSERT', 'ADIF' : adif }
+        # Construct POST data
+        post_data = {
+            'KEY': self.config.get('qrz.com', 'api_key'),
+            'ACTION': 'INSERT',
+            'ADIF': adif
+        }
 
-        # URL encode the payload
-        data = urllib.parse.urlencode(post_data)
-        # send the POST request to QRZ.com
-        response = self.send_request(data)
+        # Send the POST request to QRZ.com
+        response = self.send_request(post_data)
 
-        # Check if the upload failed and print out
-        # the reason plus some additional info
         if response:
             if "STATUS=FAIL" in response:
-                print(self.errorcol)
-                print("QSO upload failed. QRZ.com has send the following reason:\n")
+                self.colors.error("\nQSO upload failed. QRZ.com has sent the following reason:\n")
                 resp_list = response.split("&")
                 for item in resp_list:
-                    print(item)
-                print("\nPlease review the following request that led to this error:\n")
-                print(attr('reset'))
+                    self.colors.error(item)
+
+                self.colors.error("\nPlease review the following request that led to this error:\n")
                 print(post_data)
             else:
                 try:
                     logid = re.search('LOGID=(\d+)', response).group(1)
-                    print(self.successcol)
-                    print("QSO successfully uploaded to QRZ.com (LOGID "+ logid + ")")
+                    self.colors.success(f"\nQSO successfully uploaded to QRZ.com (LOGID {logid})")
                     log_status = "SUCCESS: "
-                    print(attr('reset'))
-                except: # pylint: disable=bare-except
-                    logid = "null"
-                    print(self.errorcol)
-                    print("\nQSO upload to QRZ.com failed!\n")
-                print(attr('reset'))
-            with open(self.log_file, "a") as log:
-                log.write(log_status + adif + "\n")
+                except Exception:
+                    logid = None
+                    self.colors.error("\nQSO upload to QRZ.com failed!")
+
+            # Log the result
+            try:
+                with open(log_file, "a") as log:
+                    log.write(f"{log_status}{adif}\n")
+            except Exception as e:
+                self.colors.error(f"Error writing to log file: {e}")
+
         return logid
 
 
+class UIManager:
+    """Manages user interface and interaction"""
 
-    #####################################################
-    #     Functions for generating  ASCII Tables        #
-    #####################################################
+    def __init__(self, config: Config, colors: ColorManager, file_manager: FileManager, qrz_api: QRZAPI):
+        self.config = config
+        self.colors = colors
+        self.file_manager = file_manager
+        self.qrz_api = qrz_api
+        self.qso = None
+        self.log_file = Path(config.get('log', 'log_file', '/tmp/qrzlogger.log'))
+        self.recent_qso_limit = 5
+        self.session_defaults = {
+            'freq': config.get_section('bandfreqs')[config.get('qso_defaults', 'band')],
+            'mode': config.get('qso_defaults', 'mode'),
+            'tx_pwr': config.get('qso_defaults', 'tx_pwr')
+        }
 
-    @staticmethod
-    def get_qso_table(result):
-        """Generate a pretty ascii table containing all
-        previous QSOs with a specific call sign"""
+    def show_call_info(self, call: str, session_key: str) -> None:
+        """Display information about a call sign"""
+        cleaned_call = CallSignUtils.remove_indicators(call)
+        result = self.qrz_api.get_call_data(call, session_key)
 
-        table = PrettyTable(['Date', 'Time', 'Band', 'Mode', 'RST-S', 'RST-R', 'Power', 'QRZ', 'LotW', 'Comment'])
+        if result:
+            self.colors.print_table(self._get_xml_query_table(result))
+        else:
+            self.colors.error(f"\n{call.upper()} has no record on QRZ.com")
+            if call != cleaned_call:
+                result = self.qrz_api.get_call_data(cleaned_call, session_key)
+                if result:
+                    self.colors.highlight(f"\nShowing results for {cleaned_call} instead")
+                    self.colors.print_table(self._get_xml_query_table(result))
+
+        self._show_previous_qsos(call)
+
+    def _show_previous_qsos(self, call: str) -> None:
+        """Show previous QSOs with a call sign"""
+        result = self.qrz_api.get_qsos(f"CALL:{call}")
+
+        if result and result[0]:
+            self.colors.highlight(f"\nPrevious QSOs with {call.upper()}")
+            table = self._get_qso_table(result)
+            self.colors.print_table(table)
+
+    def _get_qso_table(self, result: List[Dict[str, str]]) -> PrettyTable:
+        """Generate a table of QSO information"""
+        table = PrettyTable(['Date', 'Time', 'Band', 'Mode', 'RST-S', 'RST-R', 'Power', 'Distance'])
+
         for qso in result:
             if "qso_date" in qso:
-                date = datetime.datetime.strptime(qso["qso_date"], '%Y%m%d').strftime('%Y/%m/%d')
-                time = datetime.datetime.strptime(qso["time_on"], '%H%M').strftime('%H:%M')
-                # add missing fields to dict
-                for field in ["band", "mode", "rst_sent", "rst_rcvd", "tx_pwr", "app_qrzlog_status", "lotw_qsl_rcvd", "comment"]:
+                # Format date and time
+                try:
+                    date = datetime.datetime.strptime(qso["qso_date"], '%Y%m%d').strftime('%Y/%m/%d')
+                    time = datetime.datetime.strptime(qso["time_on"], '%H%M').strftime('%H:%M')
+                except ValueError:
+                    date = qso["qso_date"]
+                    time = qso["time_on"]
+
+                # Ensure all fields exist
+                fields = ["band", "mode", "rst_sent", "rst_rcvd", "tx_pwr", "distance"]
+                for field in fields:
                     if field not in qso:
                         qso[field] = ""
-                table.add_row([date, time, qso["band"], qso["mode"], qso["rst_sent"], \
-                        qso["rst_rcvd"], qso["tx_pwr"], qso["app_qrzlog_status"], qso["lotw_qsl_rcvd"], qso["comment"]])
+
+                # Add row to table
+                table.add_row([
+                    date, time, qso["band"], qso["mode"],
+                    qso["rst_sent"], qso["rst_rcvd"], qso["tx_pwr"],
+                    qso["distance"]
+                ])
+
         table.align = "r"
         return table
 
+    def query_qso_data(self) -> Optional[Dict[str, List[str]]]:
+        """Query QSO details from the user"""
 
-    @staticmethod
-    def get_xml_query_table(result):
-        """Print a pretty ascii table containing all interesting
-        data found for a specific call sign"""
-
-        table = PrettyTable(['key', 'value'])
-        if "fname" in result:
-            table.add_row(["First Name", result["fname"]])
-        if "name" in result:
-            table.add_row(["Last Name", result["name"]])
-        if "addr1" in result:
-            table.add_row(["Street", result["addr1"]])
-        if "addr2" in result:
-            table.add_row(["City", result["addr2"]])
-        if "state" in result:
-            table.add_row(["State", result["state"]])
-        if "country" in result:
-            table.add_row(["Country", result["country"]])
-        if "grid" in result:
-            table.add_row(["Locator", result["grid"]])
-        if "email" in result:
-            table.add_row(["Email", result["email"]])
-        if "qslmgr" in result:
-            table.add_row(["QSL via:", result["qslmgr"]])
-        table.align = "l"
-        table.header = False
-        return table
-
-
-    @staticmethod
-    def get_extra_info_table(extra_info):
-        """Print a pretty ascii table containing some
-        extra info"""
-
-        table = PrettyTable(['key', 'value'])
-        if "cty_country" in extra_info:
-            table.add_row(["Country:", extra_info["cty_country"]])
-        if "cty_continent" in extra_info:
-            table.add_row(["Continent:", extra_info["cty_continent"]])
-        if "lotw_call_date" in extra_info and extra_info["lotw_call_date"] != "":
-            table.add_row(["LotW uploaded ({}):".format(extra_info["lotw_call"]), extra_info["lotw_call_date"]])
-        if "lotw_cleaned_call_date" in extra_info and extra_info["lotw_cleaned_call_date"] != "":
-            table.add_row(["LotW uploaded ({}):".format(extra_info["lotw_cleaned_call"]), extra_info["lotw_cleaned_call_date"]])
-        table.align = "l"
-        table.header = False
-        return table
-
-
-    @staticmethod
-    def get_qso_detail_table(qso):
-        """Print a pretty ascii table containing all
-        previously entered user data"""
-
-        table = PrettyTable(['key', 'value'])
-        for item in qso:
-            table.add_row([qso[item][0], qso[item][1]])
-        table.align = "l"
-        table.header = False
-        return table
-
-
-    @staticmethod
-    def get_recent_qso_table(recent_qsos):
-        """Print a pretty ascii table containing
-        the n previous QSOs"""
-
-        table = PrettyTable(['Time', 'Frequency', 'Call'])
-        for hist_qso in recent_qsos:
-            table.add_row([hist_qso[1], hist_qso[2], hist_qso[0]])
-
-        table.align = "l"
-        table.header = True
-        return table
-
-
-    #####################################################
-    #          User Interaction Functions               #
-    #####################################################
-
-    def query_qso_data(self, qso):
-        """Queries QSO specific data from the user via
-        the command line"""
-
+        # Get current UTC time
         date_time = datetime.datetime.now(timezone.utc)
         dt_now = date_time.replace(tzinfo=timezone.utc)
 
-        # If this is the first try filling out the QSO fields
-        # then we use defaults
-        if qso is None:
-            if not self.contest:
+        # Define questions based on mode and existing QSO data
+        if self.qso is None:
+            # Initial QSO entry - use defaults from config
                 questions = {
-                    "band": ["Band", self.config['qso_defaults']['band']],
-                    "rst_rcvd": ["RST Received", self.config['qso_defaults']['rst_rcvd']],
-                    "rst_sent": ["RST Sent", self.config['qso_defaults']['rst_sent']],
-                    "comment": ["Comment", ""],
-                    "freq": ["Frequency", ""],
-                    "mode": ["Mode", self.config['qso_defaults']['mode']],
-                    "tx_pwr": ["Power (in W)", self.config['qso_defaults']['tx_pwr']],
-                    "qso_date" : ["QSO Date", dt_now.strftime("%Y%m%d")],
+                    "freq": ["Frequency", self.session_defaults['freq']],
+                    "rst_rcvd": ["RST Received", self.config.get('qso_defaults', 'rst_rcvd')],
+                    "rst_sent": ["RST Sent", self.config.get('qso_defaults', 'rst_sent')],
+                    "mode": ["Mode", self.session_defaults['mode']],
+                    "tx_pwr": ["Power (in W)", self.session_defaults['tx_pwr']],
+                    "qso_date": ["QSO Date", dt_now.strftime("%Y%m%d")],
                     "time_on": ["QSO Time", dt_now.strftime("%H%M")]
-                    }
-            else:
-                questions = {
-                    "band": ["Band", self.config['qso_defaults']['band']],
-                    "srx": ["Serial Received", "001"],
-                    "srx_string": ["Info Received", ""],
-                    "stx": ["Serial Sent", "001"],
-                    "stx_string": ["Info Sent", ""],
-                    "freq": ["Frequency", ""],
-                    "mode": ["Mode", self.config['qso_defaults']['mode']],
-                    "rst_rcvd": ["RST Received", self.config['qso_defaults']['rst_rcvd']],
-                    "rst_sent": ["RST Sent", self.config['qso_defaults']['rst_sent']],
-                    "comment": ["Comment", ""],
-                    "qso_date" : ["QSO Date", dt_now.strftime("%Y%m%d")],
-                    "time_on": ["QSO Time", dt_now.strftime("%H%M")]
-                    }
-        # if this is not the first try, we pre-fill the
-        # vaulues we got from the last try
+                }
         else:
-            questions = qso
+            # Use existing QSO data
+            questions = self.qso
 
-        # We now loop through all defined fields and ask
-        # the user for input
-        for question in questions:
-            txt = self.inputcol + questions[question][0] + " [" + self.defvalcol \
-                    + questions[question][1] + self.inputcol + "]:" + attr('reset')
-            inp = input(txt)
-            # If the user just hits enter, we keep the default value.
-            # If not, we keep the data provided by the user
-            if inp == "c":
-                return None
-            if inp == "d":
-                return questions
-            if inp == "quit" or inp == "exit":
-                sys.exit()
-            if inp != "":
-                questions[question][1] = inp
-            # check if we are asking for the band
-            if question == "band":
-                # check if the band is in the bandfreqs dictionary
-                try:
-                    # populate the frequency with a common freq of this band
-                    bandfreqs = dict(self.config.items('bandfreqs'))
-                    questions['freq'][1] = bandfreqs[questions[question][1]]
-                except: # pylint: disable=bare-except
-                    print(self.errorcol + "\nUnable to read default frequency \
-                            values from config file." + attr('reset'))
+        # Process each field
+        for field, (prompt, default) in questions.items():
+            formatted_prompt = self.colors.format_input_prompt(prompt, default)
+            user_input = input(formatted_prompt)
+
+            # Handle special commands
+            if user_input.lower() in ["quit", "exit"]:
+                in_qso_entry = False
+                sys.exit(0)
+
+            # Use input or default
+            if user_input:
+                questions[field][1] = user_input
+
         return questions
 
+    def _get_qso_detail_table(self, qso: Dict[str, List[str]]) -> PrettyTable:
+        """Generate a table of QSO details for review"""
+        table = PrettyTable(['key', 'value'])
+        table.header = False
+        table.align = "l"
 
-    def get_input_callsign(self):
-        """query a call sign from the user"""
-        call = ""
-        while True:
-            call = input("\n\n%sEnter Callsign:%s " % (self.inputcol, attr('reset')))
-            if call == "quit" or call == "exit":
-                sys.exit()
-            # check if it has the format of a valid call sign
-            # (at least 3 characters, only alphanumeric and slashes)
-            if not (len(call) > 2 and call.replace("/", "").isalnum()):
-                print(self.errorcol + "\nPlease enter a callsign with\n * at least \
-                        3 characters\n * only letters, numbers and slashes" + attr('reset'))
-                continue
-            # make the call sign all upper case
-            call = call.upper()
-            break
-        return call
+        for field, (label, value) in qso.items():
+            table.add_row([label, value])
 
+        return table
 
-    def confirm_and_submit_qso(self, call):
-        """ask user if everything is ok. If not, start over."""
-        done = False
-        while True:
-            answer = input("\n" + self.inputcol + "Is this correct? [" + \
-                    self.defvalcol +  "y/n/c/quit" + self.inputcol + "]: " + attr('reset'))
-            answer = answer.upper()
-            if answer == "Y":
-                while True:
-                    logid = self.send_qso(self.qso, call)
-                    if logid and logid != "null":
-                        break
-                    answer = input("\n" + self.inputcol + "QSO Upload failed. Retry? [" + \
-                            self.defvalcol +  "y/n" + self.inputcol + "]: " + attr('reset'))
-                    answer = answer.upper()
-                    if answer == "N":
-                        done = True
-                        break
-                if logid and logid.lower() != "null":
-                    # pull the uploaded QSO from QRZ
-                    result = self.get_qsos("LOGIDS:"+ logid)
+    def show_qso_form(self, call: str) -> bool:
+        """Display QSO entry form and handle submission, returns True if logged"""
+        self.colors.highlight(f"\nCall: {call.upper()}{attr('reset')}")
+        self.qso = self.query_qso_data()
+
+        if not self.qso:
+            return False
+
+        # self.colors.highlight("\nPlease review your choices")
+        # self.colors.print_table(self._get_qso_detail_table(self.qso))
+
+        if self.confirm_and_submit_qso(call):
+            return True
+        return False
+
+    def confirm_and_submit_qso(self, call: str) -> bool:
+        """Ask user to confirm QSO details and submit if confirmed"""
+        global in_qso_entry
+        in_qso_entry = True
+
+        prompt = self.colors.format_input_prompt("Upload?", "y/n")
+        answer = input(f"\n{prompt} ").upper()
+
+        if answer == "Y":
+            # Attempt to send QSO
+                logid = self.qrz_api.send_qso(self.qso, call, self.log_file)
+
+                if logid:
+                    # Success - get the uploaded QSO details
+                    result = self.qrz_api.get_qsos(f"LOGIDS:{logid}")
+                    self.session_defaults['freq'] = self.qso['freq'][1]
+                    self.session_defaults['mode'] = self.qso['mode'][1]
+                    self.session_defaults['tx_pwr'] = self.qso['tx_pwr'][1]
+
                     if result and result[0]:
-                        self.print_table(self.get_qso_table(result))
-                        # add some of the QSO detail to the recent_qsos list
-                        self.recent_qsos.append([call, self.qso["time_on"][1], self.qso["freq"][1]])
-                        if len(self.recent_qsos)>self.recent_qso_limit:
-                            self.recent_qsos.pop(0)
-                    done = True
+                        table = self._get_qso_table(result)
+                        self.colors.print_table(table)
+
+                    return True  # QSO confirmed and submitted
+
+        elif answer == "N":
+            return False  # No, revise the QSO details
+
+
+    def parse_qsos_from_log(self, file_handle) -> Generator[dict, None, None]:
+        """Parse QSO entries from log file"""
+        current_qso = {}
+        for line in file_handle:
+            line = line.strip()
+            if line.startswith('<') and '>' in line:
+                tag_start = line.find('<') + 1
+                tag_end = line.find('>')
+                tag = line[tag_start:tag_end].lower()
+                value_start = tag_end + 1
+                value_end = line.find('<', value_start)
+                value = line[value_start:value_end].strip()
+                current_qso[tag] = value
+            elif not line and current_qso:
+                yield current_qso
+                current_qso = {}
+        if current_qso:
+            yield current_qso
+
+    def _get_xml_query_table(self, result: Dict[str, str]) -> PrettyTable:
+        """Generate a table of call sign information from QRZ.com"""
+        table = PrettyTable(['key', 'value'])
+        table.header = False
+        table.align = "l"
+
+        fields = [
+            ("fname", "First Name"),
+            ("name", "Last Name"),
+            ("addr1", "Street"),
+            ("addr2", "City"),
+            ("state", "State"),
+            ("country", "Country"),
+            ("grid", "Locator"),
+            ("email", "Email"),
+            ("qslmgr", "QSL via:")
+        ]
+
+        for field, label in fields:
+            if field in result:
+                table.add_row([label, result[field]])
+
+        return table
+
+
+class QRZLogger:
+    def __init__(self):
+        self.config = Config()
+        self.colors = ColorManager(self.config)
+        self.file_manager = FileManager(self.config, self.colors)
+        self.qrz_api = QRZAPI(self.config, self.colors)
+        self.ui = UIManager(self.config, self.colors, self.file_manager, self.qrz_api)
+        self.history_file =  Path.home() / ".config" / "qrzlogger" /  ".history"
+        self._init_readline()
+
+    def _init_readline(self):
+        """Initialize command history support"""
+        # Load existing history
+        if self.history_file.exists():
+            readline.read_history_file(self.history_file)
+
+        # Set history length
+        readline.set_history_length(100)
+
+        # Tab completion (basic implementation)
+        readline.parse_and_bind("tab: complete")
+        readline.set_completer(self._completer)
+
+    def _completer(self, text: str, state: int) -> Optional[str]:
+        """Basic tab completion for commands"""
+        options = [cmd for cmd in ['query', 'log', 'help', 'exit'] if cmd.startswith(text.lower())]
+        return options[state] if state < len(options) else None
+
+    def _save_history(self):
+        """Save command history to file"""
+        readline.write_history_file(self.history_file)
+
+    def run(self):
+        """Run the command prompt interface"""
+
+        while True:
+            try:
+                cmd = input("\nQRZ> ").strip()
+                if not cmd:
+                    continue
+
+                if cmd.lower() in ('exit', 'quit', ':q'):
+                    print("73!\n")
                     break
-                break
-            if answer == "C":
-                done = True
-                break
-            if answer == "N":
-                break
-            if answer == "QUIT" or answer == "EXIT":
-                sys.exit()
-        return done
 
+                if cmd.lower() == 'help':
+                    self._print_help()
+                    continue
 
+                # Split command and arguments properly
+                parts = cmd.split(maxsplit=1)
+                command = parts[0].lower()
+                call = parts[1] if len(parts) > 1 else None
+                readline.add_history(cmd)
 
-def handler(signum, frame): # pylint: disable=W0613
-    """method for handlich SIGINTs"""
-    return None
+                if command == 'query':
+                    if not call:
+                        self.colors.error("Missing callsign. Usage: query <callsign>")
+                        continue
+                    self._handle_query(call)
 
+                elif command == 'log':
+                    if not call:
+                        self.colors.error("Missing callsign. Usage: log <callsign>")
+                        continue
+                    self._handle_log(call)
 
-def quit_gracefully():
-    """Prints a message when the application is terminated"""
-    print("\n73!\n")
+                else:
+                    self.colors.error(f"Unknown command: {command}")
 
+            except KeyboardInterrupt:
+                continue
+            except Exception as e:
+                self.colors.error(f"Error: {str(e)}")
 
+    def _handle_query(self, call: str) -> None:
+        """Handle query command"""
+        session_key = self.qrz_api.get_session()
+        self.ui.show_call_info(call, session_key)
 
-#####################################################
-#                  Main Routine                     #
-#####################################################
+        if call.upper() != self.config.get('qrz.com', 'station_call'):
+            response = input("Log QSO? [y/n] ").strip().lower()
+            if response in ('', 'y', 'yes'):
+                self._handle_log(call)
+
+    def _handle_log(self, call: str) -> None:
+        """Handle log command"""
+        session_key = self.qrz_api.get_session()
+        if self.ui.show_qso_form(call):
+            self.colors.success(f"QSO with {call.upper()} logged successfully!")
+
+    def _print_help(self) -> None:
+        """Show help information"""
+        help_text = """
+Available commands:
+  query <callsign>  - Show information about a callsign
+  log <callsign>    - Start logging a QSO with the specified callsign
+  help              - Show this help message
+  exit/quit         - Exit the program
+"""
+        print(help_text)
+
 
 def main():
-    """the main routine"""
-
-    # signal handling for ctrl+c and ctrl+d
-    signal.signal(signal.SIGINT, handler)
-    atexit.register(quit_gracefully)
-
-    qrz = QRZLogger()
-    qrz.print_banner()
-
-    if qrz.contest:
-        print("\nContest mode enabled.")
-
-    keeponlogging = True
-    session_key = None
-
-
-    # Begin the main loop
-    while keeponlogging:
-        # get a session after logging into QRZ with user/pass
-        session_key = qrz.get_session()
-        qrz.qso = None
-        # print a table containing the last n logged QSOs
-        if qrz.recent_qsos:
-            print ('\n%s%sYour last %s logged QSOs%s' \
-                    % (attr('underlined'), qrz.hlcol, \
-                    qrz.recent_qso_limit, attr('reset')))
-            qrz.print_table(qrz.get_recent_qso_table(qrz.recent_qsos))
-        # query a call sign from the user
-        call = qrz.get_input_callsign()
-        cleaned_call = qrz.remove_indicators(call)
-        # query call sign data from QRZ
-        result = qrz.get_call_data(call, session_key)
-        # the query was successful
-        if result:
-            print ('\n%s%sQRZ.com results for %s%s' \
-                    % (attr('underlined'), qrz.hlcol, call, attr('reset')))
-            # generate a nice ascii table with the result
-            qrz.print_table(qrz.get_xml_query_table(result))
-        # the query was unsuccessful
-        else:
-            print ('\n%s%s has no record on QRZ.com ¯\_(ツ)_/¯%s' \
-                    % (qrz.errorcol, call, attr('reset')))
-            if call != cleaned_call:
-                # query call sign data from QRZ
-                result = qrz.get_call_data(cleaned_call, session_key)
-                # the query was successful
-                if result:
-                    print ('\n%s%sShowing results for %s instead%s' \
-                            % (attr('underlined'), qrz.hlcol, cleaned_call, attr('reset')))
-                    # generate a nice ascii table with the result
-                qrz.print_table(qrz.get_xml_query_table(result))
-            print("")
-
-
-        extra_info = {}
-
-        # If the CTY file is available, further information will be
-        # gathered from it, e.g. continent, country
-        if qrz.check_cty:
-            cty_details = qrz.get_cty_row(call)
-        else:
-            cty_details = ["-","-","-","-","-","-","-","-","-","-"]
-
-        extra_info["cty_country"] = cty_details[1]
-        extra_info["cty_continent"] = cty_details[3]
-
-        # If the LotW user activity file is available and the call
-        # sign in question is actually a LotW user, the lsat upload
-        # date will be displayed
-        if qrz.check_lotw_activity: 
-            lotw = qrz.check_lotw(call)
-            extra_info["lotw_call"] = call
-            extra_info["lotw_call_date"] = lotw
-            if call != cleaned_call:
-                lotw = qrz.check_lotw(cleaned_call)
-                extra_info["lotw_cleaned_call"] = cleaned_call
-                extra_info["lotw_cleaned_call_date"] = lotw
-
-
-        # Print the table with additional infos on the call
-        print ('%s%sExtra (non-QRZ.com) info for %s%s' \
-                % (attr('underlined'), qrz.hlcol, call, attr('reset')))
-        qrz.print_table(qrz.get_extra_info_table(extra_info))
-
-        if cty_details[2] and cty_details[2] not in qrz.confirmed_entities:
-            print ('\n%s%s>>> New One! (not confirmed via Lotw) <<<%s\n\n' \
-                    % (attr('bold'), qrz.hlcol,  attr('reset')))
-
-
-        # pull all previous QSOs from tzhe QRZ logbook
-        result = qrz.get_qsos("CALL:"+ call)
-        # ignore this part if there were no previous QSOs
-        if result and result[0]:
-            print ('%s%sPrevious QSOs with %s%s' \
-                    % (attr('underlined'), qrz.hlcol, call, attr('reset')))
-            qrz.print_table(qrz.get_qso_table(result))
-
-        print ('%s%sEnter new QSO details below%s%s (enter \'c\' to cancel, \'d\' to fast forward)%s\n' \
-                % (attr('underlined'), qrz.hlcol, attr('reset'), qrz.hlcol, attr('reset'),))
-
-        done = False
-
-        # we now ask the user for QSO details until he/she is happy with the result
-        while not done:
-            # query QSO details from the user
-            qrz.qso = qrz.query_qso_data(qrz.qso)
-            # the user has answered all questions
-            if qrz.qso:
-                print ('\n%s%sPlease review your choices%s' \
-                        % (attr('underlined'), qrz.hlcol, attr('reset')))
-                qrz.print_table(qrz.get_qso_detail_table(qrz.qso))
-                done = qrz.confirm_and_submit_qso(call)
-                '''
-                # add some of the QSO detail to the recent_qsos list
-                recent_qsos.append([call, qrz.qso["time_on"][1], qrz.qso["freq"][1]])
-                if len(recent_qsos)>qrz.recent_qso_limit:
-                    recent_qsos.pop(0)
-                '''
-            # the user has entered 'c' during the QSO detail entering process
-            else:
-                done = True
-                qrz.qso = None
-                continue
-
+    try:
+        logger = QRZLogger()
+        logger.run()
+    except Exception as e:
+        print(f"\nFatal error: {e}")
+        sys.exit(1)
 
 if __name__ == "__main__":
-    try:
-        sys.exit(main())
-    except EOFError:
-        pass
+    main()
