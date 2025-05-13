@@ -521,7 +521,7 @@ class UIManager:
         result = self.qrz_api.get_qsos(f"CALL:{call}")
 
         if result and result[0]:
-            self.colors.highlight(f"\nPrevious QSOs with {call.upper()}")
+            self.colors.highlight(f"Previous QSOs with {call.upper()}")
             table = self._get_qso_table(result)
             self.colors.print_table(table)
 
@@ -736,6 +736,7 @@ class QRZLogger:
 
                 if cmd.lower() in ('exit', 'quit', ':q'):
                     print("73!\n")
+                    self._save_history()
                     break
 
                 if cmd.lower() == 'help':
@@ -746,7 +747,8 @@ class QRZLogger:
                 parts = cmd.split(maxsplit=1)
                 command = parts[0].lower()
                 call = parts[1] if len(parts) > 1 else None
-                readline.add_history(cmd)
+                if len(cmd) > 1: # no y/n 
+                    readline.add_history(cmd)
 
                 if command == 'query':
                     if not call:
